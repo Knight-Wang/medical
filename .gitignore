@@ -18,5 +18,8 @@ result.txt
 # csv
 graph_new.csv
 
+#pyc
+SimRank.pyc
+
 # other
 .idea/
