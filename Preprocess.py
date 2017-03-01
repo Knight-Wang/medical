@@ -66,11 +66,11 @@ def getMappingResult(name_segs, normalized_dic): #return name
         n_words = getWords(disease_name)
         disease_name_alias = otherForm(disease_name)
 
-        #normalized disease entity may include in the description
+        # normalized disease entity may include in the description
         if len(n_words) == len(n_words & description_words):
                 res.add(disease_name)
 
-        #alias disease name may include in the dscription
+        # alias disease name may include in the dscription
         for n_alias in disease_name_alias:
               n_alias_words = getWords(n_alias)
               len_intersection = len(n_alias_words & description_words)
