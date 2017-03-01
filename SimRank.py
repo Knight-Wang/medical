@@ -3,11 +3,11 @@
 
 import numpy as np
 import mysql.connector
-
+import DataBase as db
 
 class SimRank(object):
 
-    def __init__(self, c=0.8, it=100):
+    def __init__(self, c=0.8, it=100, graph_file=''):
         self.nodes = []                   # 所有的节点存入数组
         self.nodes_index = {}             # <节点名，节点编号>
         self.damp = c                     # 阻尼系数
@@ -16,8 +16,10 @@ class SimRank(object):
         self.iter = it                    # 最大迭代次数
         self.link_in = {}                 # 点的入点集合字典
         self.link_out = {}                # 点的出点集合字典
+        if graph_file != '':
+            self.init_param(graph_file)
 
-    def init_param(self, graph_file):
+    def init_param(self, graph_file):  # 从文件中读取图结构
         f = open(graph_file, "r")
         while True:
             line = f.readline()
@@ -44,59 +46,55 @@ class SimRank(object):
                     in_neighbors = self.link_in[out_neighbor_id]
                 in_neighbors.append(node_id)
                 self.link_in[out_neighbor_id] = in_neighbors
-
+        # 初始化转移概率矩阵
         self.trans_matrix = np.zeros((len(self.nodes), len(self.nodes)))
         for node, in_neighbors in self.link_in.items():
             num = len(in_neighbors)
             prob = 1.0 / num
             for neighbor in in_neighbors:
                 self.trans_matrix[neighbor, node] = prob
-
+        # 初始化相似度矩阵
         self.sim_matrix = np.identity((len(self.nodes))) * (1 - self.damp)
 
+    # 一次迭代
     def iterate(self):
         self.sim_matrix = self.damp * np.dot(np.dot(self.trans_matrix.transpose(), self.sim_matrix),
                                              self.trans_matrix) + (1 - self.damp) * np.identity(len(self.nodes))
 
-    def sim_rank(self, graph_file):
-        self.init_param(graph_file)
-        print "nodes:"
-        print self.nodes_index
-        print "trans ratio:"
-        print self.trans_matrix
+    # sim_rank算法
+    def sim_rank(self):
+        # print "nodes:"
+        # print self.nodes_index
+        # print "trans ratio:"
+        # print self.trans_matrix
         for i in range(self.iter):
             print "iteration %d:" % (i + 1)
             self.iterate()
-            print self.sim_matrix
+            # print self.sim_matrix
 
+    # 计算某个候选标准疾病名称（gn）和某个待消歧的非标准疾病名称的
+    # 好邻居们（good）的相似度均值
     def cal(self, gn, good):
         i = self.nodes_index[gn]
-        sum = 0.0
+        ave = 0.0
         for g in good:
             j = self.nodes_index[g]
-            sum += self.sim_matrix[i, j]
+            ave += self.sim_matrix[i, j]
         if len(good):
-            return sum / len(good)
+            return ave / len(good)
         return 0.0
 
     @staticmethod
     def get_normal():
-        conn = mysql.connector.connect(user='root',
-                                       password='123456',
-                                       database='medical',
-                                       use_unicode='True')
-        cursor = conn.cursor(buffered=True)
-
-        cursor.execute('select 疾病名称 from norm6')
-
-        values = cursor.fetchall()
+        d = db.DataBase()
+        values = d.query('select 疾病名称 from norm6')
         normal = set()  # 标准疾病名称集合
-
         for t in values:
             for s in t:
                 normal.add(s)
         return normal
 
+    # 将非标准疾病名称分类
     def classify(self):
         f = open("bad_names.txt", "r")
         f1 = open("result.txt", "w")
