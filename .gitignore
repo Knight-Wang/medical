@@ -19,7 +19,7 @@ result.txt
 graph_new.csv
 
 #pyc
-SimRank.pyc
+*.pyc
 
 # other
 .idea/
