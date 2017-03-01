@@ -5,15 +5,7 @@ str_process.py
 visual_graph.py
 
 # txt
-res.txt
-sort.txt
-sort2.txt
-bad_guys.txt
-bad_names.txt
-graph.txt
-graph_test.txt
-linkgraph.txt
-result.txt
+*.txt
 
 # csv
 graph_new.csv
