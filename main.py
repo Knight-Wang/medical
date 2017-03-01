@@ -5,69 +5,68 @@ import sys
 import datetime
 import re
 import codecs
-import SimRank as SR
+import SimRank as sr
 import DataBase as db
+import Preprocess
 
 
 reload(sys)
 sys.setdefaultencoding('utf8')
 
 
-def process(name):
-    result = name.replace('&nbsp;', '')
-    result = re.split('\(|\)| |\*|（|）|\[|\]|【|】|,|，|、|;|；', result)
-    return [x for x in filter(lambda x: x != '', result)]
-
-
-def is_normal(l, n):
-    for x in l:
-        if x in n:
-            return x
-    return None
+# def process(name):
+#     result = name.replace('&nbsp;', '')
+#     result = # re.split('\(|\)| |\*|（|）|\[|\]|【|】|,|，|、|;|；', result)
+#     return [x for x in filter(lambda x: x != '', result)]
+#
+#
+# def is_normal(l, n):
+#     for x in l:
+#         if x in n:
+#             return x
+#     return None
 
 if __name__ == "__main__":
-    normal = set()
-    f = open("texts/in/good_names_heart.txt", "r")
+    '''
+    normal = set()  # 心脏相关标准疾病名称
+    d = db.DataBase()
+    values = d.query('select 疾病名称 from i2025')
+    for x in values:
+        for y in x:
+            normal.add(y)
 
-    try:
-        while True:
-            row = f.readlines()
-            if not row:
-                break
-            for x in row:
-                tmp = x.strip('\n')
-                normal.add(tmp)
-    finally:
-        f.close()
-
-    print '标准疾病名称个数为 %d' % len(normal)
+    print '标准疾病名称个数为 %d' % len(normal)  # 84 个
 
     start_time = datetime.datetime.now()
-    d = db.DataBase()
-    values = d.query('select S050100, S050200, S050600, S050700, \
-                             S050800, S050900, S051000, S051100, \
-                             S056000, S056100, S056200 \
-                        from d2014_2015 limit 100000')
+    values = d.query('select 出院诊断名称, 出院诊断名称1, 出院诊断名称2, \
+                             出院诊断名称3, 出院诊断名称4, 出院诊断名称5, \
+                             出院诊断名称6, 出院诊断名称7, 出院诊断名称8, \
+                             出院诊断名称9, 出院诊断名称10 \
+                        from heart')
+
+    # d = db.DataBase()
+    # values = d.query('select S050100, S050200, S050600, S050700, \
+    #                          S050800, S050900, S051000, S051100, \
+    #                          S056000, S056100, S056200 \
+    #                     from d2014_2015 limit 100000')
 
     G = {}
     total = set()  # 标准疾病名称集合
     total_bad = {}  # <非标准疾病名称, 出现次数>
     cnt = 0
     cnt_all = 0
-
     bad_names = {}  # 存储非标准疾病名称和它的标准疾病名称邻居们
-
     for t in values:
         link = set()  # 这条记录中的标准名称集合
         bad = set()  # 这条记录中的非标准名称集合
         for s in t:
             if s:
-                tmp = process(s)
-                res = is_normal(tmp, normal)
+                # tmp = process(s)
+                # res = is_normal(tmp, normal)
                 cnt_all += 1
-                if res:  # 成功匹配
-                    link.add(res)
-                    total.add(res)
+                if s in normal:  # 成功匹配
+                    link.add(s)
+                    total.add(s)
                     cnt += 1
                 else:  # 未匹配
                     bad.add(s)
@@ -94,23 +93,31 @@ if __name__ == "__main__":
     print '运行时间%d秒' % (end_time - start_time).seconds
     print '已经识别的种类数为 %d' % len(total)
 
-    # f = codecs.open("graph.txt", "w", "utf-8")
-    # try:
-    #     for x in G:
-    #         tmp = x
-    #         if len(G[x]):
-    #             tmp += ' '
-    #             l = len(G[x])
-    #             i = 0
-    #             for y in G[x]:
-    #                 tmp += y
-    #                 if i != l - 1:
-    #                     tmp += ' '
-    #                 i += 1
-    #         f.writelines(tmp + '\n')
-    # finally:
-    #     f.close()
+    f = codecs.open("texts/out/graph.txt", "w", "utf-8")
+    try:
+        for x in G:
+            tmp = x
+            if len(G[x]):
+                tmp += ' '
+                l = len(G[x])
+                i = 0
+                for y in G[x]:
+                    tmp += y
+                    if i != l - 1:
+                        tmp += ' '
+                    i += 1
+            f.writelines(tmp + '\n')
+    finally:
+        f.close()
+    '''
 
+    start_time = datetime.datetime.now()
+    s = sr.SimRank(graph_file="texts/out/graph.txt")
+    s.sim_rank()
+    s.print_result("texts/out/similarity.txt")
+    end_time = datetime.datetime.now()
+    print '节点数: %d' % len(s.nodes)
+    print 'sim_rank运行时间为%d' % (end_time - start_time).seconds
     # f = codecs.open("bad_names.txt", "w", "utf-8")
     # try:
     #     for b in bad_names:

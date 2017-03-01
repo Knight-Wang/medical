@@ -6,18 +6,18 @@ from Preprocess import *
 reload(sys)
 sys.setdefaultencoding('utf8')
 
-conn = MySQLdb.connect("localhost", "root", "10081008", "Medical", charset='utf8')
+conn = MySQLdb.connect("localhost", "root", "123456", "medical", charset='utf8')
 
 cursor = conn.cursor()
 
-cursor.execute('select 主要编码,疾病名称 from Norm6')
-# cursor.execute('select ICD,疾病名称 from I2025')
+# cursor.execute('select 主要编码,疾病名称 from norm6')
+cursor.execute('select ICD,疾病名称 from i2025')
 values = cursor.fetchall()
 normal = getNormalNames(values) #(normalized_name, ICD-10)
 
 starttime = datetime.datetime.now()
 
-cursor.execute('select ICD, 非标准名称, 标准疾病名 from LabeledData limit 10000;') #index, unormalized_name
+cursor.execute('select ICD, 非标准名称, 标准疾病名 from labeleddata') #index, unormalized_name
 values = cursor.fetchall()
 
 dir = "Experiment_LabeledData"

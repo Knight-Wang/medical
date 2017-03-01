@@ -5,6 +5,7 @@ import numpy as np
 import mysql.connector
 import DataBase as db
 
+
 class SimRank(object):
 
     def __init__(self, c=0.8, it=100, graph_file=''):
@@ -68,9 +69,31 @@ class SimRank(object):
         # print "trans ratio:"
         # print self.trans_matrix
         for i in range(self.iter):
-            print "iteration %d:" % (i + 1)
+            print "iteration %d" % (i + 1)
             self.iterate()
             # print self.sim_matrix
+
+    # 打印结果
+    def print_result(self, sim_node_file):
+        # 打印node之间的相似度
+        f_out_user = open(sim_node_file, "w")
+        for i in range(len(self.nodes)):
+            f_out_user.write(self.nodes[i] + "\t")
+            neighbour = []
+            for j in range(len(self.nodes)):
+                if i != j:
+                    sim = self.sim_matrix[i, j].round(4)
+                    if not sim:
+                        sim = 0
+                    if sim > 0:
+                        neighbour.append((j, sim))
+            # 按相似度由大到小排序
+            neighbour = sorted(
+                neighbour, cmp=lambda x, y: cmp(x[1], y[1]), reverse=True)
+            for (u, sim) in neighbour:
+                f_out_user.write(self.nodes[u] + ":" + str(sim) + "\t")
+            f_out_user.write("\n")
+        f_out_user.close()
 
     # 计算某个候选标准疾病名称（gn）和某个待消歧的非标准疾病名称的
     # 好邻居们（good）的相似度均值
