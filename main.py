@@ -110,14 +110,14 @@ if __name__ == "__main__":
     finally:
         f.close()
     '''
-
     start_time = datetime.datetime.now()
     s = sr.SimRank(graph_file="texts/out/graph.txt")
     s.sim_rank()
-    s.print_result("texts/out/similarity.txt")
+    # s.print_result("texts/out/similarity.txt")
     end_time = datetime.datetime.now()
     print '节点数: %d' % len(s.nodes)
     print 'sim_rank运行时间为%d' % (end_time - start_time).seconds
+
     # f = codecs.open("bad_names.txt", "w", "utf-8")
     # try:
     #     for b in bad_names:
