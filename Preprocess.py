@@ -10,13 +10,15 @@ import  os
 reload(sys)
 sys.setdefaultencoding('utf8')
 
-def process (str):
+
+def process(str):
     res = str.replace('&nbsp;', '')
-    #res = res.replace('?', '')
-    #res = res.replace('？', '')
+    # res = res.replace('?', '')
+    # res = res.replace('？', '')
     # res = re.split('\(|\)| |\*|（|）|\[|\]|【|】|,|，|、|;|；', res) #用标点（（，："【】）*）进行切分
     res = re.split(r'[\（, \）,，, ., ;,：, \s, \*，\[, \], +,?]\s*', res) #用标点（（，："【】）*）进行切分
     return filter(lambda x: len(x) != 1 and len(x) != 0, res)
+
 
 def otherForm(s): # consider the alias dictionary(waiting to be detailed)
     res = list()
@@ -30,12 +32,14 @@ def otherForm(s): # consider the alias dictionary(waiting to be detailed)
         res.append(s.replace("死", "塞"))
     return res
 
+
 def getWords(str):
     str_u = str.decode("utf-8")
     res = set()
     for i in str_u:
         res.add(i)
     return res
+
 
 def getMappingResult(name_segs, normalized_dic): #return name
     name_str = "".join(name_segs)
@@ -75,6 +79,7 @@ def getMappingResult(name_segs, normalized_dic): #return name
                    break
     return res
 
+
 def getNormalNames(values):
     normal = {}  # 标准疾病名称字典(normalized_name, ICD-10)
 
@@ -82,6 +87,7 @@ def getNormalNames(values):
         if isinstance(row[0], unicode):
             normal[row[1].decode('utf-8')] = row[0].decode('utf-8')
     return normal
+
 
 def writeFile(file, unormalized, u_id, normalized, n_id):
     file.write(unormalized + " | " + u_id + " | " + normalized + " | " + n_id + "\n")
