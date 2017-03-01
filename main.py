@@ -11,7 +11,7 @@ import SimRank as SR
 reload(sys)
 sys.setdefaultencoding('utf8')
 
-'''
+
 def process(name):
     result = name.replace('&nbsp;', '')
     result = re.split('\(|\)| |\*|（|）|\[|\]|【|】|,|，|、|;|；', result)
@@ -145,7 +145,6 @@ try:
 finally:
     f.close()
 
-'''
 
 if __name__ == "__main__":
     s = SR.SimRank(graph_file="graph_test.txt")
