@@ -38,31 +38,17 @@ for row in values:
         normalized_name = row[2].strip()
         p_name = process(unnormalized_name)
 
-        # icd_set = getMappingResult(p_name, normal)
-        name_set = getMappingResult(p_name, normal)
+        name_dict = getMappingResult(p_name, normal)
 
-        # if normalized_name == "---":
-        #     unmap_id += 1
-        #     writeFile(unmap_ICD, " ".join(p_name), repr(icd_set), normalized_name, normalized_id)
-
-        if len(name_set) != 0:
-            if normalized_name in name_set: # map correctly
-                cnt += 1
-            else: # map to a disease name but the name is not the labeled one.
-                other_nt += 1
-                writeFile(other_file, " ".join(p_name), ",".join(list(name_set)), normalized_name, normalized_id)
+        if len(name_dict) != 0:
+                if normalized_name in name_dict.keys(): # map correctly
+                    cnt += 1
+                else: # map to a disease name but the name is not the labeled one.
+                    other_nt += 1
+                    str_pair = [k + ":" + str(v) for k,v in name_dict.iteritems()]
+                    writeFile(other_file, " ".join(p_name), ",".join(str_pair), normalized_name, normalized_id)
         else: # cannot map
             writeFile(wrong_file, " ".join(p_name), "---", normalized_name, normalized_id)
-
-        #ICD
-        # if len(icd_set) != 0:
-        #     if normalized_id in icd_set: # map correctly
-        #         cnt += 1
-        #     else: # map to a disease name but the name is not the labeled one.
-        #         other_nt += 1
-        #         writeFile(other_file, " ".join(p_name), repr(icd_set), normalized_name, normalized_id)
-        # else: # cannot map
-        #     writeFile(wrong_file, " ".join(p_name), "---", normalized_name, normalized_id)
 
 wrong_file.close()
 other_file.close()
