@@ -11,13 +11,15 @@ import pypinyin, Levenshtein
 reload(sys)
 sys.setdefaultencoding('utf8')
 
-def process (str):
+
+def process(str):
     res = str.replace('&nbsp;', '')
-    #res = res.replace('?', '')
-    #res = res.replace('？', '')
+    # res = res.replace('?', '')
+    # res = res.replace('？', '')
     # res = re.split('\(|\)| |\*|（|）|\[|\]|【|】|,|，|、|;|；', res) #用标点（（，："【】）*）进行切分
     res = re.split(ur"[（ ）\( \)， \. ;、： \s+ \*\[ \] \+ ？? \,]", res) #用标点（（，："【】）*）进行切分
     return filter(lambda x: len(x) != 1 and len(x) != 0, res)
+
 #
 # def otherForm(s): # consider the alias dictionary(waiting to be detailed)
 #     res = list()
@@ -37,6 +39,7 @@ def getWords(str):
     for i in str_u:
         res.add(i)
     return res
+
 
 def getMappingResult(name_segs, normalized_dic): #return name
     name_str = "".join(name_segs)
@@ -105,6 +108,7 @@ def getNormalNames(values):
         if isinstance(row[0], unicode):
             normal[row[1].decode('utf-8')] = row[0].decode('utf-8')
     return normal
+
 
 def writeFile(file, unormalized, u_id, normalized, n_id):
     file.write(unormalized + " | " + u_id + " | " + normalized + " | " + n_id + "\n")
