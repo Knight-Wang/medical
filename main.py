@@ -147,5 +147,7 @@ finally:
 
 '''
 
-s = SR.SimRank(graph_file="graph_test.txt")
-s.sim_rank()
+if __name__ == "__main__":
+    s = SR.SimRank(graph_file="graph_test.txt")
+    s.sim_rank()
+    print s.sim_matrix
