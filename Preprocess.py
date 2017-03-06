@@ -162,26 +162,26 @@ def getMappingResult(name_segs, normalized_dic): #return name, flag(compute_brot
                 res[disease_name_original] = sim
                 if load_alias_flag and disease_name in alias.keys(): # add alias
                     res[alias[disease_name]] = sim
-        return res, 3
+        return res, 3 #基于部位的语义匹配
 
     res_find = {}
     for disease_name in normalized_dic.keys():
         sim = sim_segs_entity(name_segs, disease_name)
 
-        if name_str.find(disease_name) != -1 or sim >= 0.80: #半精确匹配
+        if name_str.find(disease_name) != -1 or sim >= 0.80: # 半精确匹配
             res_find[disease_name] = sim
             if load_alias_flag and disease_name in alias.keys():  # add alias
                 res_find[alias[disease_name]] = sim
 
-        if sim >= 0.62: #模糊匹配
+        if sim >= 0.62: # 模糊匹配
             res[disease_name] = sim
             if load_alias_flag and disease_name in alias.keys(): # add alias
                 res[alias[disease_name]] = sim
 
     if len(res_find) != 0:
-        return res_find, 2
+        return res_find, 2 #半精确匹配
 
-    return res, 4
+    return res, 4   #模糊匹配
 
 def sim_words(s,t):
     sw = getWords(s)
