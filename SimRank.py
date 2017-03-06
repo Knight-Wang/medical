@@ -4,7 +4,7 @@
 import numpy as np
 import mysql.connector
 import DataBase as db
-
+import codecs
 
 class SimRank(object):
 
@@ -21,7 +21,7 @@ class SimRank(object):
             self.init_param(graph_file)
 
     def init_param(self, graph_file):  # 从文件中读取图结构
-        f = open(graph_file, "r")
+        f = codecs.open(graph_file, "r", "utf-8")
         while True:
             line = f.readline()
             if not line:
@@ -72,6 +72,24 @@ class SimRank(object):
             print "iteration %d" % (i + 1)
             self.iterate()
             # print self.sim_matrix
+
+    # 得到结果
+    def get_result(self):
+        res = {}
+        for i in range(len(self.nodes)):
+            neighbour = []
+            for j in range(len(self.nodes)):
+                if i != j:
+                    sim = self.sim_matrix[i, j].round(4)
+                    if not sim:
+                        sim = 0
+                    if sim > 0:
+                        neighbour.append((self.nodes[j], sim))
+            # 按相似度由大到小排序
+            neighbour = sorted(
+                neighbour, cmp=lambda x, y: cmp(x[1], y[1]), reverse=True)
+            res[self.nodes[i]] = [x for x in neighbour]
+        return res
 
     # 打印结果
     def print_result(self, sim_node_file):
