@@ -73,7 +73,7 @@ def getMappingResult(name_segs, normalized_dic): #return name
 
         #完整诊断是否包含标准疾病名称
         if name_str.find(disease_name) != -1:
-            res[disease_name] = 0.9
+            res[disease_name] = 0.85
 
         else:
             #对分隔开的诊断片段判断和标准疾病的相似度
