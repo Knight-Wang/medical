@@ -8,7 +8,7 @@ visual_graph.py
 *.txt
 
 # csv
-graph_new.csv
+*.csv
 
 #pyc
 *.pyc
