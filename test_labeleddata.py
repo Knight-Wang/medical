@@ -30,11 +30,12 @@ cursor.execute('select ICD, 非标准名称, 标准疾病名 from LabeledData li
 values = cursor.fetchall()
 
 enable_write_candidates = True
+dir = "Experiment_LabeledData"
+if os.path.exists(dir) == False:
+    os.mkdir(dir)
+
 if enable_write_candidates:
     starttime = datetime.datetime.now()
-    dir = "Experiment_LabeledData"
-    if os.path.exists(dir) == False:
-        os.mkdir(dir)
     wrong_file = open(dir + "/wrong_res.txt", "w")
     other_file = open(dir + "/mapping_other_res.txt", "w")
     unmap_ICD = open(dir + "/unmapped_ICD.txt", "w")
@@ -49,6 +50,8 @@ match_type_distr = [0,0,0,0]
 
 topK = 1
 cnt_sim_k = 0
+
+file = open(dir + "/disambiguate_res.txt", "w")
 
 for row in values:
         normalized_id = row[0].strip()
@@ -68,9 +71,11 @@ for row in values:
         len_candidates = len(name_dict)
         candidate_num[len_candidates/5] += 1
 
+        sort_name_list = sorted(name_dict.items(), key=lambda d: d[1], reverse=True)
+
         if enable_write_candidates:
             if len_candidates != 0:
-                    str_pair = [k + ":" + str(v) for k, v in name_dict.iteritems()]
+                    str_pair = [k + ":" + str(v) for (k, v) in sort_name_list]
 
                     if normalized_name in name_dict.keys(): # map correctly
                         cnt += 1
@@ -83,7 +88,7 @@ for row in values:
 
         # test the result of the basic disambiguation
         if len_candidates != 0:
-            sort_name_list = sorted(name_dict.items(), key=lambda d: d[1], reverse=True)
+
             candidate_top_k = []
 
             # topK
@@ -102,10 +107,16 @@ for row in values:
 
             if normalized_name in candidate_top_k:
                     cnt_sim_k += 1
+            else:
+                str_pair = [k + ":" + str(v) for (k, v) in sort_name_list]
+                writeFile(file, " ".join(p_name), ",".join(str_pair), normalized_name, normalized_id)
+
 
 print("Experiment: Test the basic disambiguation(top %d in the candidate includes the normalized disease name)" % topK)
 print(cnt_sim_k)
 print(float(cnt_sim_k) / float(len(values)))
+
+file.close()
 
 if enable_write_candidates:
     wrong_file.close()
