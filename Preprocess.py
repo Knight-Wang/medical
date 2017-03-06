@@ -11,27 +11,39 @@ import pypinyin, Levenshtein
 reload(sys)
 sys.setdefaultencoding('utf8')
 
+def loadAlias():
+    file = open("./Alias.txt")
+    alias = {}
+
+    while 1:
+        line = file.readline().strip()
+        if not line:
+            break
+
+        n1 = line.split(" ")[0]
+        n2 = line.split(" ")[1]
+        alias[n1.decode("utf-8")] = n2.decode("utf-8")
+        alias[n2.decode("utf-8")] = n1.decode("utf-8")
+    return alias
 
 def process(str):
-    res = str.replace('&nbsp;', '')
-    # res = res.replace('?', '')
-    # res = res.replace('？', '')
-    # res = re.split('\(|\)| |\*|（|）|\[|\]|【|】|,|，|、|;|；', res) #用标点（（，："【】）*）进行切分
-    res = re.split(ur"[（ ）\( \)， \. ;、： \s+ \*\[ \] \+ ？? \,]", res) #用标点（（，："【】）*）进行切分
-    return filter(lambda x: len(x) != 1 and len(x) != 0, res)
+    res_0 = str.replace('&nbsp;', '')
+    res_0 = re.sub(r"\w\d+.\d+", '', res_0) #去除掉ICD编码 egI20.222
+    res_0 = re.sub(r"\s\w+", "", res_0)
 
-#
-# def otherForm(s): # consider the alias dictionary(waiting to be detailed)
-#     res = list()
-#     if s.find("型") != -1:
-#         res.append(s.replace("型", "性"))
-#     if s.find("性") != -1:
-#         res.append(s.replace("性", "型"))
-#     if s.find("塞") != -1:
-#         res.append(s.replace("塞", "死"))
-#     if s.find("死") != -1:
-#         res.append(s.replace("死", "塞"))
-#     return res
+    pattern = re.compile(ur"[上下左右正前后侧]+[间壁室]+")
+    location = re.findall(pattern, res_0)
+
+    res_1 = re.sub(pattern, "", res_0)
+
+    # res = re.split('\(|\)| |\*|（|）|\[|\]|【|】|,|，|、|;|；', res) #用标点（（，："【】）*）进行切分
+    res = re.split(ur"[（ ）\( \)， \. ;、： \s+ \*\[ \] \+ ？? \,]", res_1) #用标点（（，："【】）*）进行切分
+
+    res = filter(lambda x: len(x) != 1 and len(x) != 0, res)
+    if len(location) != 0:
+        res.append("".join(location))
+
+    return res
 
 def getWords(str):
     str_u = str.decode("utf-8")
@@ -40,54 +52,136 @@ def getWords(str):
         res.add(i)
     return res
 
+def getICDTree(normal):
+    icd4_dict = {}
 
-def getMappingResult(name_segs, normalized_dic): #return name
+    for name, icd6 in normal.iteritems():
+        icd4 = icd6[:5]
+        if icd4 not in icd4_dict.keys():
+            icd4_dict[icd4] = [(name, icd6)]
+        else:
+            icd4_dict[icd4].append((name, icd6))
+    return icd4_dict
+
+def addFatherAndBrotherNodes(segs, name_dict, icd3_dic, icd4_dic, icd6_dict ):
+    res = {}
+
+    for name, sim in name_dict.iteritems():
+        icd4 = icd6_dict[name][:5]
+        icd3 = icd4[:3]
+        res[name] = sim
+
+        father_node = icd3_dic[icd3]
+        sim_f = sim_segs_entity(segs, father_node)
+
+        res[father_node] = sim_f
+
+        brothernodes = icd4_dic[icd4]
+
+        for (brothernode,icd) in brothernodes:
+            sim_b = sim_segs_entity(segs, brothernode)
+            if sim_b >= 0.70:
+                res[brothernode] = sim_b
+    return res
+
+def addFatherNode(segs, name_dict, icd3_dic, icd6_dict):
+    res = {}
+
+    for name, sim in name_dict.iteritems():
+        icd4 = icd6_dict[name][:5]
+        icd3 = icd4[:3]
+        res[name] = sim
+
+        father_node = icd3_dic[icd3]
+        sim_f = sim_segs_entity(segs, father_node)
+        res[father_node] = sim_f
+
+    return res
+
+def sim_segs_entity(segs, e):
+    name_str = "".join(segs)
+    sim_s = max(sim_words(name_str, e), sim_pinyin(name_str, e))
+
+    sim_seg_w = 0
+    sim_seg_p = 0
+    for seg in segs:
+        # sim_seg_w = max(1.0 - Levenshtein.distance(seg, e)/float(max(len(seg), len(e))), sim_seg_w)
+        sim_seg_w = max(Levenshtein.ratio(seg, e), sim_seg_w)
+        sim_seg_p = max(sim_pinyin(seg, e), sim_seg_p)
+
+    return max(sim_s, max(sim_seg_p, sim_seg_w))
+
+def compare_location(l1, l2):
+    l1 = "".join(l1)
+    l2 = "".join(l2)
+    adj1 = re.findall(ur"[上下左右正前后侧]", l1)
+    adj2 = re.findall(ur"[上下左右正前后侧]", l2)
+    adj_intersection = [x for x in adj1 if x in adj2]
+    adj_sim = float(len(adj_intersection)) / (len(adj1))
+
+    part1 = re.findall(ur"[间壁室]", l1)
+    part2 = re.findall(ur"[间壁室]", l2)
+    part_intersection = [x for x in part1 if x in part2]
+    part_sim = float(len(part_intersection)) / (len(part1))
+    return (adj_sim + part_sim) / 2
+
+def getMappingResult(name_segs, normalized_dic): #return name, flag(compute_brother_nodes)
     name_str = "".join(name_segs)
     res = dict()
+    alias = loadAlias()
+    load_alias_flag = True
 
-    # for seg in name_segs:
-    #     #could be optimized...
-    #     for disease_name in normalized_dic.keys():
-    #         # 完全匹配
-    #         if seg.find(disease_name) != -1:
-    #             res.add(disease_name)
-    #
-    #         # deal with alias of disease names(such as 型VS性)
-    #         disease_name_alias = otherForm(disease_name)
-    #         for n_a in disease_name_alias:
-    #             if seg.find(n_a) != -1:
-    #                 res.add(disease_name)
+    # 精确匹配
+    if name_str in normalized_dic.keys():
+        res[name_str] = 1
+        if load_alias_flag and name_str in alias.keys(): # add alias
+                res[alias[name_str]] = 1
+        return res, 1
 
+    # 针对存在部位的疾病名称
+    location = re.findall(ur"[上下左右正前后侧][间壁室]", name_segs[-1])
+    if len(location) != 0:  # 存在部位
+
+        for disease_name in normalized_dic.keys():
+            disease_name_original = disease_name
+            disease_name_location = re.findall(ur"[上下左右正前后侧][间壁室]", disease_name)
+            if load_alias_flag and len(disease_name_location) != 0:  # add alias
+                re.sub(ur"[上下左右正前后侧][间壁室]", "", disease_name)
+
+            if len(disease_name_location) != 0:
+                sim_location = compare_location(location, disease_name_location)
+            else:
+                sim_location = -1
+
+            sim_no_location = sim_segs_entity(name_segs[:-1], disease_name)
+            sim = sim_no_location
+            if sim_location != -1:
+                sim = sim_location / 3 + 2 * sim_no_location / 3
+
+            if sim >= 0.70:
+                res[disease_name_original] = sim
+                if load_alias_flag and disease_name in alias.keys(): # add alias
+                    res[alias[disease_name]] = sim
+        return res, 3
+
+    res_find = {}
     for disease_name in normalized_dic.keys():
+        sim = sim_segs_entity(name_segs, disease_name)
 
-        # 可能seg并不包括完整的疾病名称，因此先将整个字符串和标准名称对比
-        sim = sim_words(name_str, disease_name)
-        if sim >= 0.75:
+        if name_str.find(disease_name) != -1 or sim >= 0.80: #半精确匹配
+            res_find[disease_name] = sim
+            if load_alias_flag and disease_name in alias.keys():  # add alias
+                res_find[alias[disease_name]] = sim
+
+        if sim >= 0.62: #模糊匹配
             res[disease_name] = sim
-            continue
+            if load_alias_flag and disease_name in alias.keys(): # add alias
+                res[alias[disease_name]] = sim
 
-        sim_p = sim_pinyin(name_str, disease_name)
-        if sim_p >= 0.75:
-            res[disease_name] = sim_p
-            continue
+    if len(res_find) != 0:
+        return res_find, 2
 
-        #完整诊断是否包含标准疾病名称
-        if name_str.find(disease_name) != -1:
-            res[disease_name] = 0.85
-
-        else:
-            #对分隔开的诊断片段判断和标准疾病的相似度
-            for seg in name_segs:
-                sim = sim_words(seg, disease_name)
-                if sim >= 0.75:
-                    res[disease_name] = sim
-                    continue
-
-                sim_p = sim_pinyin(seg, disease_name)
-                if sim_p >= 0.75:
-                    res[disease_name] = sim_p
-                    continue
-    return res
+    return res, 4
 
 def sim_words(s,t):
     sw = getWords(s)
@@ -96,10 +190,41 @@ def sim_words(s,t):
     return sim
 
 def sim_pinyin(s,t):
-    sp = "".join(pypinyin.lazy_pinyin(s))
-    tp = "".join(pypinyin.lazy_pinyin(t))
-    sim = Levenshtein.ratio(sp, tp)
+    sp = pypinyin.lazy_pinyin(s)
+    tp = pypinyin.lazy_pinyin(t)
+
+    sp_str = "".join(sp)
+    tp_str = "".join(tp)
+
+    if sp_str.find(tp_str) != -1:  # 针对标准疾病名称后面跟随了一个附加语的情况，eg"不稳定型心绞痛心脏扩大心功能Ⅲ级"
+        return 0.8
+
+    if abs(len(sp)-len(tp)) >= 4: # 针对诊断较长的情况，用拼音的词集合
+            intersection = [x for x in tp if x in sp]
+            sim = float(len(intersection)) / float(max(len(sp), len(tp)))
+    else:
+        sim = Levenshtein_distance_pinyin(sp, tp)
     return sim
+
+def Levenshtein_distance_pinyin(s, t):
+    m,n = len(s), len(t)
+    dist = [[0.0 for j in range(n+1)] for i in range(m + 1)]
+
+    for i in range(1, m + 1):
+        dist[i][0] = i * 1.0
+    for j in range(1, n + 1):
+        dist[0][j] = j * 1.0
+
+    for i in range(1, m + 1):
+        for j in range(1, n + 1):
+            if s[i - 1] == t[j - 1]:
+                dist[i][j] = dist[i - 1][j - 1]
+            else:
+                # cost = Levenshtein.ratio(s[i-1], t[j-1])
+                dist[i][j] = min(dist[i - 1][j] + 1.0,  # t delete a char
+                              dist[i][j - 1] + 1.0,  # t insert a char
+                              dist[i - 1][j - 1] + 1.0)  # t substitute a char
+    return 1.0 - float(dist[m][n])/max(m,n)
 
 def getNormalNames(values):
     normal = {}  # 标准疾病名称字典(normalized_name, ICD-10)
@@ -108,7 +233,6 @@ def getNormalNames(values):
         if isinstance(row[0], unicode):
             normal[row[1].decode('utf-8')] = row[0].decode('utf-8')
     return normal
-
 
 def writeFile(file, unormalized, u_id, normalized, n_id):
     file.write(unormalized + " | " + u_id + " | " + normalized + " | " + n_id + "\n")
