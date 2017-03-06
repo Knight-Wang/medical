@@ -7,17 +7,11 @@ import re
 import codecs
 import SimRank as sr
 import DataBase as db
-import Preprocess
 from Preprocess import *
+import copy
 
 reload(sys)
 sys.setdefaultencoding('utf8')
-
-
-def process(name):
-    result = name.replace('&nbsp;', '')
-    result = re.split('\(|\)| |\*|（|）|\[|\]|【|】|,|，|、|;|；', result)
-    return [x for x in filter(lambda x: x != '', result)]
 
 
 def is_normal(l, n):
@@ -33,12 +27,6 @@ def transform(x):
     return x
 
 
-def same(x, y):
-    return (x == y) or \
-           (x == '不稳定性心绞痛' and y == '增强型心绞痛') or \
-           (x == '增强型心绞痛' and y == '不稳定性心绞痛')
-
-
 def cal(norm1, norm2, sim_rank):
     ok1 = transform(norm1)
     ok2 = transform(norm2)
@@ -50,67 +38,88 @@ def cal(norm1, norm2, sim_rank):
     return 0.0
 
 
+def dic2list(dic):
+    l = [(k, v) for (k, v) in dic.iteritems()]
+    l = sorted(l, cmp=lambda x, y: cmp(x[1], y[1]), reverse=True)
+    return l
+
+
 def classify(bad_one, candidate, good_neigh, sim_mat):
     res = {}
-    max_sim = -1.0
-    best_one = '$$$'
-    can_list = [(k, v) for (k, v) in candidate.iteritems()]
-    can_list = sorted(can_list, cmp=lambda x, y: cmp(x[1], y[1]), reverse=True)
-    if bad_one not in good_neigh.keys():
-        return can_list, None, can_list[0][0], None
+    can_list = dic2list(candidate)
+    if abs(can_list[0][1] - 1.0) <= 1e-5 or \
+       (bad_one not in good_neigh.keys()) or \
+       not len(good_neigh[bad_one]):
+        return candidate, False
     for c, sim in can_list:
         sum_s = 0.0
         for gn in good_neigh[bad_one]:
             sum_s += cal(c, gn, sim_mat)
-        if not len(good_neigh[bad_one]):
-            res[c] = 0.0
-        else:
-            sum_s /= len(good_neigh[bad_one])  # 候选标名和坏名字的好邻居们的平均相似度
-            res[c] = sum_s
-        if sum_s > max_sim:
-            max_sim = sum_s
-            best_one = c
-    return can_list, good_neigh[bad_one], best_one, res
+        sum_s /= len(good_neigh[bad_one])  # 候选标名和坏名字的好邻居们的平均相似度
+        res[c] = sum_s
+    return res, True
+
+
+def weighting(before, after, multiple ,ratio):  # simrank之前结果字典，simrank之后结果字典，之后所占加权系数
+    res = copy.copy(before)
+    for k in res.iterkeys():
+        res[k] = res[k] * (1.0 - ratio) + after[k] * multiple * ratio
+    return res
+
+
+def verdict(l, label, top_k):
+    if top_k == 1:
+        if len(l) > 1 and l[1][1] == l[0][1]:
+            return label == l[1][0] or label == l[0][0]
+        return label == l[0][0]
+    r = min(top_k, len(l))
+    tmp_l = [l[i][0] for i in range(r)]
+    return label in tmp_l
 
 if __name__ == "__main__":
 
     d = db.DataBase()
-    values = d.query('select ICD, 疾病名称 from i2025')
+    values = d.query('select ICD, 疾病名称 from I2025')
     normal = getNormalNames(values)
+    icd4_dic = getICDTree(normal)
+
+    values = d.query('select 类目编码,类目名称 from Norm3')
+    icd3_dict = {}
+    for row in values:
+        icd3_dict[row[0]] = row[1]
     start_time = datetime.datetime.now()
-    # records = d.query('select 出院诊断名称, 出院诊断名称1, 出院诊断名称2, \
-    #                           出院诊断名称3, 出院诊断名称4, 出院诊断名称5, \
-    #                           出院诊断名称6, 出院诊断名称7, 出院诊断名称8, \
-    #                           出院诊断名称9, 出院诊断名称10 \
-    #                      from heart')
+
+    values = d.query('select 手术名称 from heart_surgery')
+    normal_surgery = set()  # 标准手术名称集合
+    for t in values:
+        for s in t:
+            normal_surgery.add(s)
 
     records = d.query('select S050100, S050200, S050600, S050700, \
                               S050800, S050900, S051000, S051100, \
-                              S056000, S056100, S056200 \
-                      from heart_new')
+                              S056000, S056100, S056200, \
+                              S050501, S051201, S051301, S051401, \
+                              S051501, S057001, S057101, S057201, \
+                              S057301, S057401 \
+                         from heart_new')
+
     G = {}
-    # total = set()  # 标准疾病名称集合
-    # total_bad = {}  # <非标准疾病名称, 出现次数>
-    # cnt = 0
-    # cnt_all = 0
     bad_names = {}  # 存储非标准疾病名称和它的标准疾病名称邻居们
     for t in records:
         link = set()  # 这条记录中的标准名称集合
         bad = set()  # 这条记录中的非标准名称集合
+        now = 0
         for s in t:
+            now += 1
             if s:
-                # tmp = process(s)
-                # res = is_normal(tmp, normal)
-                # cnt_all += 1
-                if s in normal:  # 成功匹配
-                    link.add(s)
-                #     total.add(s)
-                #     cnt += 1
-                else:  # 未匹配
-                    bad.add(s)
-    #                 if s not in total_bad:
-    #                     total_bad[s] = 1
-    #                 total_bad[s] += 1
+                if now < 11:
+                    if s in normal:  # 成功匹配
+                        link.add(s)
+                    else:  # 未匹配
+                        bad.add(s)
+                else:
+                    if s in normal_surgery:
+                        link.add(s)
         for b in bad:  # 给“坏”名字添加“好”邻居
             if b not in bad_names:
                 bad_names[b] = set()
@@ -125,11 +134,7 @@ if __name__ == "__main__":
                 if x != y:
                     G[x].add(y)
                     G[y].add(x)
-    # end_time = datetime.datetime.now()
-    # print '正确分类的记录个数为 %d' % cnt
-    # print '非标准疾病名称个数为 %d' % cnt_all
-    # print '运行时间%d秒' % (end_time - start_time).seconds
-    # print '已经识别的种类数为 %d' % len(total)
+
     f = codecs.open("texts/out/graph.txt", "w", "utf-8")
     try:
         for x in G:
@@ -157,77 +162,83 @@ if __name__ == "__main__":
     print '节点数: %d' % len(s.nodes)
     print 'sim_rank运行时间为%d' % (end_time - start_time).seconds
     values = d.query('select 非标准名称, 标准疾病名 from labeleddata')
-    cnt = 0
+    cnt_before = 0
+    cnt_after = 0
+    cnt_weighted = 0
     f = open("texts/out/sim_rank_result.txt", "w")
     start_time = datetime.datetime.now()
-
-    cnt_c_y = 0
-    cnt_c_n = 0
-    cnt_n_y = 0
-    cnt_n_n = 0
-    checked = False
-
+    TopK = 3
     for row in values:
         unnormalized_name = row[0].strip()
         normalized_name = row[1].strip()
         p_name = process(unnormalized_name)
-        name_dict = getMappingResult(p_name, normal)
+
+        name_dict, match_type = getMappingResult(p_name, normal)
+        if match_type != 4:  # 精确匹配和半精确匹配
+            name_dict = addFatherNode(p_name, name_dict, icd3_dict, normal)
+        else:
+            name_dict = addFatherAndBrotherNodes(p_name, name_dict, icd3_dict, icd4_dic, normal)
+
         if len(name_dict) != 0:
             if normalized_name in name_dict.keys():  # map correctly
-                score = {}
-                can_list, good_nei, res_name, score = classify(unnormalized_name, name_dict, bad_names, res)
+                re_rank, checked = classify(unnormalized_name, name_dict, bad_names, res)
+                if checked:
+                    weighted = weighting(name_dict, re_rank, 10 ,0.3)
+                    weighted = dic2list(weighted)
+                re_rank = dic2list(re_rank)
                 f.writelines(str(unnormalized_name) + ':\n')
-                f.writelines("好邻居：\n")
-                if good_nei:
-                   for gn in good_nei:
-                       f.writelines(str(gn) + '\n')
-                f.writelines('候选 ' + str(len(name_dict.keys())) + ':\n')
-                if not can_list:
-                    for c in name_dict.keys():
-                        f.writelines(str(c) + '\n')
-                else:
-                    for (c, v) in can_list:
-                        f.writelines(str(c) + ' : ' + str(v) + '\n')
-                    f.writelines('---------------------------------------\n')
-                if score:
-                    rank_score = [(c, v) for (c, v) in score.iteritems()]
-                    rank_score = sorted(rank_score, cmp=lambda x, y: cmp(x[1], y[1]), reverse=True)
-                    if rank_score[0][1] > 1e-5:
-                        f.writelines('checked\n')
-                        checked = True
-                    for x in range(len(rank_score)):
-                        f.writelines(str(rank_score[x][0]) + ' : ')
-                        f.writelines(str(rank_score[x][1]) + '\n')
-                f.writelines('最终选择了: \n')
-                f.writelines(str(res_name) + '\n')
+                f.writelines('simrank之前 ' + str(len(name_dict.keys())) + ':\n')
+                rank = dic2list(name_dict)
+                for r in range(len(rank)):
+                    f.writelines(rank[r][0] + " : " + str(rank[r][1]) + "\n")
+                if checked:
+                    f.writelines("simrank之后：\n")
+                    for r in range(len(re_rank)):
+                        f.writelines(re_rank[r][0] + " : " + str(re_rank[r][1]) + "\n")
+                    f.writelines("++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+                    for w in range(len(weighted)):
+                        f.writelines(weighted[w][0] + " : " + str(weighted[w][1]) + "\n")
                 f.writelines('答案是：')
                 f.writelines(str(normalized_name) + '\n')
-                f.writelines('===========================================\n')
-                if same(res_name, normalized_name):
+                f.writelines('simrank之前结果: \n')
+                f.writelines(rank[0][0] + '\n')
+                flag = False
+                if verdict(rank, normalized_name, TopK):
                     f.writelines('yes\n')
-                    if checked:
-                        cnt_c_y += 1
-                    else:
-                        cnt_n_y += 1
-                    cnt += 1
+                    cnt_before += 1
+                    flag = True
                 else:
-                    if checked:
-                        cnt_c_n += 1
-                    else:
-                        cnt_n_n += 1
                     f.writelines('no\n')
+                if checked:
+                    f.writelines('------------------------------------------\n')
+                    f.writelines('simrank之后结果：\n')
+                    f.writelines(re_rank[0][0] + '\n')
+                    if verdict(re_rank, normalized_name, TopK):
+                        f.writelines('yes\n')
+                        cnt_after += 1
+                    else:
+                        f.writelines('no\n')
+                    f.writelines('++++++++++++++++++++++++++++++++++++++++++++\n')
+                    f.writelines('加权之后结果：\n')
+                    f.writelines(weighted[0][0] + '\n')
+                    if verdict(weighted, normalized_name, TopK):
+                        cnt_weighted += 1
+                else:
+                    if flag:
+                        cnt_after += 1
+                        cnt_weighted += 1
+                f.writelines('===========================================\n')
+
             else:  # map to a disease name but the name is not the labeled one.
                 pass  # 待处理
         else:  # cannot map
             pass  # 待处理
     end_time = datetime.datetime.now()
-    print '经过sim_rank后分类正确的个数为 %d' % cnt
+    print 'sim_rank之前分类正确的个数为 %d' % cnt_before
+    print 'sim_rank后分类正确的个数为 %d' % cnt_after
+    print '加权之后分类正确的个数为 %d' % cnt_weighted
     print '分类运行时间为 %d' % (end_time - start_time).seconds
 
-    f.writelines(str(cnt_c_y) + '\n')
-    f.writelines(str(cnt_c_n) + '\n')
-    f.writelines(str(cnt_n_y) + '\n')
-    f.writelines(str(cnt_n_n) + '\n')
     f.close()
     # f = codecs.open("bad_names.txt", "w", "utf-8")
     # try:
