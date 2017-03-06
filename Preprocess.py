@@ -162,7 +162,7 @@ def getMappingResult(name_segs, normalized_dic): #return name, flag(compute_brot
                 sim_location = -1
 
             sim_no_location, contain_flag = sim_segs_entity(name_segs[:-1], disease_name)
-            sim = sim_no_location
+            sim = sim_no_location * 3/4
             if sim_location != -1:
                 sim = sim_location / 3 + 2 * sim_no_location / 3
 
