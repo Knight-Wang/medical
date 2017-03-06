@@ -6,7 +6,7 @@ from Preprocess import *
 reload(sys)
 sys.setdefaultencoding('utf8')
 
-conn = MySQLdb.connect("localhost", "root", "10081008", "Medical", charset='utf8')
+conn = MySQLdb.connect("localhost", "root", "123456", "medical", charset='utf8')
 
 cursor = conn.cursor()
 
@@ -24,8 +24,10 @@ for row in values:
 
 starttime = datetime.datetime.now()
 
+
 cursor.execute('select ICD, 非标准名称, 标准疾病名 from LabeledData limit 10000;') #index, unormalized_name
 # cursor.execute('select ICD, 非标准名称, 标准疾病名 from LabeledData where ICD=\'I21.404\';') #index, unormalized_name
+
 values = cursor.fetchall()
 
 dir = "Experiment_LabeledData"
