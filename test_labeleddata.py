@@ -23,10 +23,10 @@ for row in values:
     icd3_dict[row[0]] = row[1]
 
 cursor.execute('select ICD, 非标准名称, 标准疾病名 from LabeledData limit 10000;') #index, unormalized_name
-# cursor.execute('select ICD, 非标准名称, 标准疾病名 from LabeledData where ICD=\'I21.404\';') #index, unormalized_name
+# cursor.execute('select ICD, 非标准名称, 标准疾病名 from LabeledData where ICD=\'I20.902\';') #index, unormalized_name
 values = cursor.fetchall()
 
-enable_write_candidates = False
+enable_write_candidates = True
 if enable_write_candidates:
     starttime = datetime.datetime.now()
     dir = "Experiment_LabeledData"
@@ -44,7 +44,7 @@ unmap_id = 0
 candidate_num = [0,0,0,0,0,0]
 match_type_distr = [0,0,0,0]
 
-topK = 3
+topK = 1
 cnt_sim_k = 0
 
 for row in values:
@@ -52,7 +52,6 @@ for row in values:
         unnormalized_name = row[1].strip()
         normalized_name = row[2].strip()
         p_name = process(unnormalized_name)
-
 
         name_dict, match_type = getMappingResult(p_name, normal)
         match_type_distr[match_type - 1] += 1

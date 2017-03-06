@@ -27,17 +27,16 @@ def loadAlias():
     return alias
 
 def process(str):
-    res_0 = str.replace('&nbsp;', '')
-    res_0 = re.sub(r"\w\d+.\d+", '', res_0) #去除掉ICD编码 egI20.222
+    res_0 = str.replace('&nbsp;', ' ')
+    res_0 = re.sub(ur"\u3000",' ', res_0)   # 将中文的空格用英文空格代替，后面可以处理
+    res_0 = re.sub(r"\w\d+.\d+", '', res_0) # 去除掉ICD编码 egI20.222
     res_0 = re.sub(r"\s\w+", "", res_0)
 
     pattern = re.compile(ur"[上下左右正前后侧]+[间壁室]+")
     location = re.findall(pattern, res_0)
-
     res_1 = re.sub(pattern, "", res_0)
 
-    # res = re.split('\(|\)| |\*|（|）|\[|\]|【|】|,|，|、|;|；', res) #用标点（（，："【】）*）进行切分
-    res = re.split(ur"[（ ）\( \)， \. ;、： \s+ \*\[ \] \+ ？? \,]", res_1) #用标点（（，："【】）*）进行切分
+    res = re.split(ur"[（ ）\( \)， \. ;、：° \s+ \*\[ \] \+ ？? \,]", res_1) #用标点（（，："【】）*）进行切分
 
     res = filter(lambda x: len(x) != 1 and len(x) != 0, res)
     if len(location) != 0:
@@ -72,15 +71,15 @@ def addFatherAndBrotherNodes(segs, name_dict, icd3_dic, icd4_dic, icd6_dict ):
         res[name] = sim
 
         father_node = icd3_dic[icd3]
-        sim_f = sim_segs_entity(segs, father_node)
+        sim_f, contain_flag = sim_segs_entity(segs, father_node)
 
         res[father_node] = sim_f
 
         brothernodes = icd4_dic[icd4]
 
         for (brothernode,icd) in brothernodes:
-            sim_b = sim_segs_entity(segs, brothernode)
-            if sim_b >= 0.70:
+            sim_b, contain_flag = sim_segs_entity(segs, brothernode)
+            if sim_b >= 0.70 or contain_flag:
                 res[brothernode] = sim_b
     return res
 
@@ -93,13 +92,22 @@ def addFatherNode(segs, name_dict, icd3_dic, icd6_dict):
         res[name] = sim
 
         father_node = icd3_dic[icd3]
-        sim_f = sim_segs_entity(segs, father_node)
+        sim_f, contain_flag = sim_segs_entity(segs, father_node)
         res[father_node] = sim_f
 
     return res
 
 def sim_segs_entity(segs, e):
     name_str = "".join(segs)
+    contain_entity = False
+
+    sp = pypinyin.lazy_pinyin(name_str)
+    tp = pypinyin.lazy_pinyin(e)
+    sp_str = "".join(sp)
+    tp_str = "".join(tp)
+    if sp_str.find(tp_str) != -1:  # 针对标准疾病名称后面跟随了一个附加语的情况，eg"不稳定型心绞痛心脏扩大心功能Ⅲ级"
+        contain_entity = True
+
     sim_s = max(sim_words(name_str, e), sim_pinyin(name_str, e))
 
     sim_seg_w = 0
@@ -109,7 +117,7 @@ def sim_segs_entity(segs, e):
         sim_seg_w = max(Levenshtein.ratio(seg, e), sim_seg_w)
         sim_seg_p = max(sim_pinyin(seg, e), sim_seg_p)
 
-    return max(sim_s, max(sim_seg_p, sim_seg_w))
+    return max(sim_s, max(sim_seg_p, sim_seg_w)), contain_entity
 
 def compare_location(l1, l2):
     l1 = "".join(l1)
@@ -153,7 +161,7 @@ def getMappingResult(name_segs, normalized_dic): #return name, flag(compute_brot
             else:
                 sim_location = -1
 
-            sim_no_location = sim_segs_entity(name_segs[:-1], disease_name)
+            sim_no_location, contain_flag = sim_segs_entity(name_segs[:-1], disease_name)
             sim = sim_no_location
             if sim_location != -1:
                 sim = sim_location / 3 + 2 * sim_no_location / 3
@@ -162,13 +170,13 @@ def getMappingResult(name_segs, normalized_dic): #return name, flag(compute_brot
                 res[disease_name_original] = sim
                 if load_alias_flag and disease_name in alias.keys(): # add alias
                     res[alias[disease_name]] = sim
-        return res, 3 #基于部位的语义匹配
+        return res, 3 # 基于部位的语义匹配
 
     res_find = {}
     for disease_name in normalized_dic.keys():
-        sim = sim_segs_entity(name_segs, disease_name)
+        sim, contain_flag = sim_segs_entity(name_segs, disease_name)
 
-        if name_str.find(disease_name) != -1 or sim >= 0.80: # 半精确匹配
+        if name_str.find(disease_name) != -1 or contain_flag or sim >= 0.8: # 半精确匹配
             res_find[disease_name] = sim
             if load_alias_flag and disease_name in alias.keys():  # add alias
                 res_find[alias[disease_name]] = sim
@@ -179,9 +187,9 @@ def getMappingResult(name_segs, normalized_dic): #return name, flag(compute_brot
                 res[alias[disease_name]] = sim
 
     if len(res_find) != 0:
-        return res_find, 2 #半精确匹配
+        return res_find, 2 # 半精确匹配
 
-    return res, 4   #模糊匹配
+    return res, 4   # 模糊匹配
 
 def sim_words(s,t):
     sw = getWords(s)
@@ -192,12 +200,6 @@ def sim_words(s,t):
 def sim_pinyin(s,t):
     sp = pypinyin.lazy_pinyin(s)
     tp = pypinyin.lazy_pinyin(t)
-
-    sp_str = "".join(sp)
-    tp_str = "".join(tp)
-
-    if sp_str.find(tp_str) != -1:  # 针对标准疾病名称后面跟随了一个附加语的情况，eg"不稳定型心绞痛心脏扩大心功能Ⅲ级"
-        return 0.8
 
     if abs(len(sp)-len(tp)) >= 4: # 针对诊断较长的情况，用拼音的词集合
             intersection = [x for x in tp if x in sp]
