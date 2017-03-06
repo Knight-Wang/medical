@@ -105,6 +105,8 @@ if __name__ == "__main__":
 
     G = {}
     bad_names = {}  # 存储非标准疾病名称和它的标准疾病名称邻居们
+    appear = {}
+    co_appear = {}
     for t in records:
         link = set()  # 这条记录中的标准名称集合
         bad = set()  # 这条记录中的非标准名称集合
@@ -115,11 +117,17 @@ if __name__ == "__main__":
                 if now < 11:
                     if s in normal:  # 成功匹配
                         link.add(s)
+                        if s not in appear:
+                            appear[s] = 1
+                        appear[s] += 1
                     else:  # 未匹配
                         bad.add(s)
                 else:
                     if s in normal_surgery:
                         link.add(s)
+                        if s not in appear:
+                            appear[s] = 1
+                        appear[s] += 1
         for b in bad:  # 给“坏”名字添加“好”邻居
             if b not in bad_names:
                 bad_names[b] = set()
@@ -127,13 +135,20 @@ if __name__ == "__main__":
                 bad_names[b].add(l)
         for x in link:
             for y in link:
-                if x not in G:
-                    G[x] = set()
-                if y not in G:
-                    G[y] = set()
-                if x != y:
-                    G[x].add(y)
-                    G[y].add(x)
+                if x < y:
+                    tmp = (x, y)
+                    if tmp not in co_appear:
+                        co_appear[tmp] = 1
+                    co_appear[tmp] += 1
+    for (x, y) in co_appear:
+        val = co_appear[(x, y)] * 1.0 / (appear[x] + appear[y] - co_appear[(x, y)])
+        if val > 0.05:
+            if x not in G:
+                G[x] = set()
+            G[x].add(y)
+            if y not in G:
+                G[y] = set()
+            G[y].add(x)
 
     f = codecs.open("texts/out/graph.txt", "w", "utf-8")
     try:
@@ -167,7 +182,7 @@ if __name__ == "__main__":
     cnt_weighted = 0
     f = open("texts/out/sim_rank_result.txt", "w")
     start_time = datetime.datetime.now()
-    TopK = 3
+    TopK = 1
     for row in values:
         unnormalized_name = row[0].strip()
         normalized_name = row[1].strip()
@@ -183,7 +198,7 @@ if __name__ == "__main__":
             if normalized_name in name_dict.keys():  # map correctly
                 re_rank, checked = classify(unnormalized_name, name_dict, bad_names, res)
                 if checked:
-                    weighted = weighting(name_dict, re_rank, 10 ,0.3)
+                    weighted = weighting(name_dict, re_rank, 10, 0.2)
                     weighted = dic2list(weighted)
                 re_rank = dic2list(re_rank)
                 f.writelines(str(unnormalized_name) + ':\n')
@@ -195,7 +210,7 @@ if __name__ == "__main__":
                     f.writelines("simrank之后：\n")
                     for r in range(len(re_rank)):
                         f.writelines(re_rank[r][0] + " : " + str(re_rank[r][1]) + "\n")
-                    f.writelines("++++++++++++++++++++++++++++++++++++++++++++++++++++++")
+                    f.writelines("++++++++++++++++++++++++++++++++++++++++++++++++++++++\n")
                     for w in range(len(weighted)):
                         f.writelines(weighted[w][0] + " : " + str(weighted[w][1]) + "\n")
                 f.writelines('答案是：')
@@ -222,7 +237,10 @@ if __name__ == "__main__":
                     f.writelines('加权之后结果：\n')
                     f.writelines(weighted[0][0] + '\n')
                     if verdict(weighted, normalized_name, TopK):
+                        f.writelines('yes\n')
                         cnt_weighted += 1
+                    else:
+                        f.writelines("no\n")
                 else:
                     if flag:
                         cnt_after += 1
