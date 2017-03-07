@@ -22,10 +22,10 @@ class SimRank(object):
 
     def init_param(self, graph_file):  # 从文件中读取图结构
         f = codecs.open(graph_file, "r", "utf-8")
-        while True:
+        nodes = int(f.readline())
+        while nodes:
+            nodes -= 1
             line = f.readline()
-            if not line:
-                break
             arr = line.split()
             node = arr[0]
             if node in self.nodes_index:
@@ -34,8 +34,12 @@ class SimRank(object):
                 node_id = len(self.nodes)
                 self.nodes_index[node] = node_id
                 self.nodes.append(node)
-            for ele in arr[1:]:
-                out_neighbor = ele
+            edges = int(arr[1].decode('utf-8'))
+            while edges:
+                edges -= 1
+                out = f.readline().split()
+                out_neighbor = out[0]
+                degree = int(out[1].decode('utf-8'))
                 if out_neighbor in self.nodes_index:
                     out_neighbor_id = self.nodes_index[out_neighbor]
                 else:
@@ -45,15 +49,19 @@ class SimRank(object):
                 in_neighbors = []
                 if out_neighbor_id in self.link_in:
                     in_neighbors = self.link_in[out_neighbor_id]
-                in_neighbors.append(node_id)
+                in_neighbors.append((node_id, degree))
                 self.link_in[out_neighbor_id] = in_neighbors
+
         # 初始化转移概率矩阵
         self.trans_matrix = np.zeros((len(self.nodes), len(self.nodes)))
         for node, in_neighbors in self.link_in.items():
-            num = len(in_neighbors)
-            prob = 1.0 / num
+            num = 0
+            for i in range(len(in_neighbors)):
+                num += in_neighbors[i][1]
             for neighbor in in_neighbors:
-                self.trans_matrix[neighbor, node] = prob
+                prob = neighbor[1] * 1.0 / num
+                self.trans_matrix[neighbor[0], node] = prob
+        # print self.trans_matrix
         # 初始化相似度矩阵
         self.sim_matrix = np.identity((len(self.nodes))) * (1 - self.damp)
 
@@ -71,7 +79,6 @@ class SimRank(object):
         for i in range(self.iter):
             print "iteration %d" % (i + 1)
             self.iterate()
-            # print self.sim_matrix
 
     # 得到结果
     def get_result(self):
@@ -80,7 +87,7 @@ class SimRank(object):
             neighbour = []
             for j in range(len(self.nodes)):
                 if i != j:
-                    sim = self.sim_matrix[i, j].round(4)
+                    sim = self.sim_matrix[i, j].round(6)
                     if not sim:
                         sim = 0
                     if sim > 0:
@@ -100,7 +107,7 @@ class SimRank(object):
             neighbour = []
             for j in range(len(self.nodes)):
                 if i != j:
-                    sim = self.sim_matrix[i, j].round(4)
+                    sim = self.sim_matrix[i, j].round(6)
                     if not sim:
                         sim = 0
                     if sim > 0:

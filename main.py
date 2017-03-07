@@ -140,30 +140,28 @@ if __name__ == "__main__":
                     if tmp not in co_appear:
                         co_appear[tmp] = 1
                     co_appear[tmp] += 1
+
     for (x, y) in co_appear:
-        val = co_appear[(x, y)] * 1.0 / (appear[x] + appear[y] - co_appear[(x, y)])
-        if val > 0.05:
-            if x not in G:
-                G[x] = set()
-            G[x].add(y)
-            if y not in G:
-                G[y] = set()
-            G[y].add(x)
+        if x not in G:
+            G[x] = set()
+        G[x].add(y)
+        if y not in G:
+            G[y] = set()
+        G[y].add(x)
 
     f = codecs.open("texts/out/graph.txt", "w", "utf-8")
     try:
+        f.writelines(str(len(G.keys())) + '\n')
         for x in G:
             tmp = x
             if len(G[x]):
-                tmp += ' '
-                l = len(G[x])
-                i = 0
+                f.writelines(tmp + ' ' + str(len(G[x])) + '\n')
                 for y in G[x]:
-                    tmp += y
-                    if i != l - 1:
-                        tmp += ' '
-                    i += 1
-            f.writelines(tmp + '\n')
+                    f.writelines(y)
+                    a = min(x, y)
+                    b = max(x, y)
+                    val = co_appear[(a, b)]
+                    f.writelines(' ' + str(val) + '\n')
     finally:
         f.close()
 
@@ -198,7 +196,7 @@ if __name__ == "__main__":
             if normalized_name in name_dict.keys():  # map correctly
                 re_rank, checked = classify(unnormalized_name, name_dict, bad_names, res)
                 if checked:
-                    weighted = weighting(name_dict, re_rank, 10, 0.2)
+                    weighted = weighting(name_dict, re_rank, 1, 0.5)
                     weighted = dic2list(weighted)
                 re_rank = dic2list(re_rank)
                 f.writelines(str(unnormalized_name) + ':\n')
@@ -256,8 +254,8 @@ if __name__ == "__main__":
     print 'sim_rank后分类正确的个数为 %d' % cnt_after
     print '加权之后分类正确的个数为 %d' % cnt_weighted
     print '分类运行时间为 %d' % (end_time - start_time).seconds
-
     f.close()
+
     # f = codecs.open("bad_names.txt", "w", "utf-8")
     # try:
     #     for b in bad_names:
