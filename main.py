@@ -31,11 +31,11 @@ def cal(norm1, norm2, sim_rank):
     ok1 = transform(norm1)
     ok2 = transform(norm2)
     if ok1 not in sim_rank.keys():
-        return 0.0
+        return None
     for tup in range(len(sim_rank[ok1])):
         if sim_rank[ok1][tup][0] == ok2:
             return sim_rank[ok1][tup][1]
-    return 0.0
+    return None
 
 
 def dic2list(dic):
@@ -51,13 +51,20 @@ def classify(bad_one, candidate, good_neigh, sim_mat):
        (bad_one not in good_neigh.keys()) or \
        not len(good_neigh[bad_one]):
         return candidate, False
+    flag = False
     for c, sim in can_list:
         sum_s = 0.0
         for gn in good_neigh[bad_one]:
-            sum_s += cal(c, gn, sim_mat)
+            tmp = cal(c, gn, sim_mat)
+            if tmp:
+                sum_s += tmp
+        if sum_s > 0.0:
+            flag = True
         sum_s /= len(good_neigh[bad_one])  # 候选标名和坏名字的好邻居们的平均相似度
         res[c] = sum_s
-    return res, True
+    if flag:
+        return res, True
+    return candidate, False
 
 
 def weighting(before, after, multiple ,ratio):  # simrank之前结果字典，simrank之后结果字典，之后所占加权系数
@@ -157,8 +164,8 @@ if __name__ == "__main__":
 
     G = {}
     bad_names = {}  # 存储非标准疾病名称和它的标准疾病名称邻居们
-    appear = {}
-    co_appear = {}
+    appear = {}  # 单个标准疾病名称出现次数
+    co_appear = {}  # <标准疾病名称1, 标准疾病名称2> 出现次数
     for t in records:
         link = set()  # 这条记录中的标准名称集合
         bad = set()  # 这条记录中的非标准名称集合
@@ -168,7 +175,7 @@ if __name__ == "__main__":
             if s:
                 if now < 11:
                     if s in normal:  # 成功匹配
-                        link.add(s)
+                        # link.add(s)
                         if s not in appear:
                             appear[s] = 1
                         appear[s] += 1
