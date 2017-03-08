@@ -67,14 +67,66 @@ def weighting(before, after, multiple ,ratio):  # simrank之前结果字典，si
     return res
 
 
+def alias(name):
+    res = set()
+    if name == '不稳定性心绞痛' or name == '增强型心绞痛':
+        res.add('不稳定性心绞痛')
+        res.add('增强型心绞痛')
+    elif name == '冠状动脉痉挛' or name == '变异型心绞痛':
+        res.add('冠状动脉痉挛')
+        res.add('变异型心绞痛')
+    else:
+        res.add(name)
+    return res
+
+
 def verdict(l, label, top_k):
-    if top_k == 1:
-        if len(l) > 1 and l[1][1] == l[0][1]:
-            return label == l[1][0] or label == l[0][0]
-        return label == l[0][0]
+    # if top_k == 1:
+    #     if len(l) > 1 and l[1][1] == l[0][1]:
+    #         return label == l[1][0] or label == l[0][0]
+    #     return label == l[0][0]
     r = min(top_k, len(l))
     tmp_l = [l[i][0] for i in range(r)]
-    return label in tmp_l
+    tmp = alias(label)
+    for t in tmp:
+        if t in tmp_l:
+            return True
+    return False
+
+
+def print_right_log(right_file, bad_name, before, after, label, cnt):  # 把之前分错而simrank分对的记录打印到正确日志中
+    right_file.writelines(str(cnt) + '\n')
+    right_file.writelines('非标准疾病名称：\n')
+    right_file.writelines(bad_name + '\n')
+    right_file.writelines("simrank之前：\n")
+    for x in range(len(before)):
+        right_file.writelines(before[x][0] + " : " + str(before[x][1]) + '\n')
+    right_file.writelines("---------------------------------------------------\n")
+    right_file.writelines("simrank之后：\n")
+    for x in range(len(after)):
+        right_file.writelines(after[x][0] + " : " + str(after[x][1]) + '\n')
+    right_file.writelines("---------------------------------------------------\n")
+    right_file.writelines("正确答案:\n")
+    right_file.writelines(label + '\n')
+    right_file.writelines("=================================================\n")
+
+
+def print_wrong_log(wrong_file, bad_name, before, after, label, cnt):  # 把之前分对而simrank分错的记录打印到错误日志中
+    wrong_file.writelines(str(cnt) + '\n')
+    wrong_file.writelines('非标准疾病名称：\n')
+    wrong_file.writelines(bad_name + '\n')
+    wrong_file.writelines("simrank之前：\n")
+    for x in range(len(before)):
+        wrong_file.writelines(before[x][0] + " : " + str(before[x][1]) + '\n')
+    wrong_file.writelines("---------------------------------------------------\n")
+    wrong_file.writelines("simrank之后：\n")
+    for x in range(len(after)):
+        wrong_file.writelines(after[x][0] + " : " + str(after[x][1]) + '\n')
+    wrong_file.writelines("---------------------------------------------------\n")
+    wrong_file.writelines("正确答案:\n")
+    wrong_file.writelines(label + '\n')
+    wrong_file.writelines("=================================================\n")
+
 
 if __name__ == "__main__":
 
@@ -170,7 +222,8 @@ if __name__ == "__main__":
     s.sim_rank()
     res = s.get_result()
 
-    # s.print_result("texts/out/similarity.txt")
+    s.print_result("texts/out/similarity.txt")
+
     end_time = datetime.datetime.now()
     print '节点数: %d' % len(s.nodes)
     print 'sim_rank运行时间为%d' % (end_time - start_time).seconds
@@ -178,7 +231,11 @@ if __name__ == "__main__":
     cnt_before = 0
     cnt_after = 0
     cnt_weighted = 0
+    cnt_noise = 0
+    cnt_correct = 0
     f = open("texts/out/sim_rank_result.txt", "w")
+    wrong = open("texts/out/sim_rank_wrong.txt", "w")
+    right = open("texts/out/sim_rank_right.txt", "w")
     start_time = datetime.datetime.now()
     TopK = 1
     for row in values:
@@ -229,8 +286,14 @@ if __name__ == "__main__":
                     if verdict(re_rank, normalized_name, TopK):
                         f.writelines('yes\n')
                         cnt_after += 1
+                        if not flag:
+                            cnt_correct += 1
+                            print_right_log(right, unnormalized_name, rank, re_rank, normalized_name, cnt_correct)
                     else:
                         f.writelines('no\n')
+                        if flag:
+                            cnt_noise += 1
+                            print_wrong_log(wrong, unnormalized_name, rank, re_rank, normalized_name, cnt_noise)
                     f.writelines('++++++++++++++++++++++++++++++++++++++++++++\n')
                     f.writelines('加权之后结果：\n')
                     f.writelines(weighted[0][0] + '\n')
@@ -255,7 +318,8 @@ if __name__ == "__main__":
     print '加权之后分类正确的个数为 %d' % cnt_weighted
     print '分类运行时间为 %d' % (end_time - start_time).seconds
     f.close()
-
+    wrong.close()
+    right.close()
     # f = codecs.open("bad_names.txt", "w", "utf-8")
     # try:
     #     for b in bad_names:
