@@ -51,6 +51,8 @@ def classify(bad_one, candidate, good_neigh, sim_mat):
        (bad_one not in good_neigh.keys()) or \
        not len(good_neigh[bad_one]):
         return candidate, False
+    if can_list[0][1] >= 0.9:  # 减小噪声，如果排名第一的候选相似度很高（大于0.9），就不再进行sim_rank
+        return candidate, False
     flag = False
     for c, sim in can_list:
         sum_s = 0.0
@@ -175,7 +177,7 @@ if __name__ == "__main__":
             if s:
                 if now < 11:
                     if s in normal:  # 成功匹配
-                        # link.add(s)
+                        link.add(s)
                         if s not in appear:
                             appear[s] = 1
                         appear[s] += 1
