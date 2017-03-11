@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 from Preprocess import *
+import MySQLdb
 
 reload(sys)
 sys.setdefaultencoding('utf8')
@@ -26,7 +27,7 @@ cursor.execute('select ICD, 非标准名称, 标准疾病名 from LabeledData li
 # cursor.execute('select ICD, 非标准名称, 标准疾病名 from LabeledData where ICD=\'I20.902\';') #index, unormalized_name
 values = cursor.fetchall()
 
-enable_write_candidates = True
+enable_write_candidates = False #是否将消歧结果写入文件
 dir = "Experiment_LabeledData"
 if os.path.exists(dir) == False:
     os.mkdir(dir)
@@ -66,7 +67,7 @@ for row in values:
 
         # name_dict is the candidate set(name : sim)
         len_candidates = len(name_dict)
-        candidate_num[len_candidates/5] += 1
+        candidate_num[len_candidates / 5] += 1
 
         sort_name_list = sorted(name_dict.items(), key=lambda d: d[1], reverse=True)
 
@@ -97,8 +98,8 @@ for row in values:
                     candidate_top_k.append(sort_name_list[0][0])
 
                     # 针对两个标准疾病名称的相似度并列第一情况(可能别名情况下，两个疾病的相似度相同)
-                    if len_candidates >= 2 and sort_name_list[1][1] == sort_name_list[0][1]:
-                        candidate_top_k.append(sort_name_list[1][0])
+                    # if len_candidates >= 2 and sort_name_list[1][1] == sort_name_list[0][1]:
+                    #     candidate_top_k.append(sort_name_list[1][0])
             else:
                 candidate_top_k = [sort_name_list[i][0] for i in range(len_candidates)]
 
