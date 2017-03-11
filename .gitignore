@@ -1,14 +1,11 @@
 # python
-bad_records.py
-edit_distance.py
-str_process.py
 visual_graph.py
 
 # txt
 *.txt
 
 # csv
-graph_new.csv
+*.csv
 
 #pyc
 *.pyc

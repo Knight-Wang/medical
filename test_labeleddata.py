@@ -7,7 +7,7 @@ import MySQLdb
 reload(sys)
 sys.setdefaultencoding('utf8')
 
-conn = MySQLdb.connect("localhost", "root", "10081008", "Medical", charset='utf8')
+conn = MySQLdb.connect("localhost", "root", "123456", "medical", charset='utf8')
 
 cursor = conn.cursor()
 
@@ -23,8 +23,11 @@ icd3_dict = {}
 for row in values:
     icd3_dict[row[0]] = row[1]
 
+starttime = datetime.datetime.now()
+
 cursor.execute('select ICD, 非标准名称, 标准疾病名 from LabeledData limit 10000;') #index, unormalized_name
-# cursor.execute('select ICD, 非标准名称, 标准疾病名 from LabeledData where ICD=\'I20.902\';') #index, unormalized_name
+# cursor.execute('select ICD, 非标准名称, 标准疾病名 from LabeledData where ICD=\'I21.404\';') #index, unormalized_name
+
 values = cursor.fetchall()
 
 enable_write_candidates = False #是否将消歧结果写入文件
