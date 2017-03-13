@@ -31,11 +31,11 @@ def cal(norm1, norm2, sim_rank):
     ok1 = transform(norm1)
     ok2 = transform(norm2)
     if ok1 not in sim_rank.keys():
-        return 0.0
+        return None
     for tup in range(len(sim_rank[ok1])):
         if sim_rank[ok1][tup][0] == ok2:
             return sim_rank[ok1][tup][1]
-    return 0.0
+    return None
 
 
 def dic2list(dic):
@@ -46,18 +46,36 @@ def dic2list(dic):
 
 def classify(bad_one, candidate, good_neigh, sim_mat):
     res = {}
+    neigh_sim = {}
     can_list = dic2list(candidate)
     if abs(can_list[0][1] - 1.0) <= 1e-5 or \
        (bad_one not in good_neigh.keys()) or \
        not len(good_neigh[bad_one]):
-        return candidate, False
+        return candidate, False, None
+    if can_list[0][1] > 0.857:  # 减小噪声，如果排名第一的候选相似度很高（大于0.857），就不再进行sim_rank
+        return candidate, False, None
+    # top_sim = can_list[0][1]
+    # i = 1
+    # while i < len(can_list) and abs(can_list[i][1] - top_sim) < 1e-6:
+    #     i += 1
+    # if i == 1:
+    #     return candidate, False
+    flag = False
     for c, sim in can_list:
+        neigh_sim[c] = []
         sum_s = 0.0
         for gn in good_neigh[bad_one]:
-            sum_s += cal(c, gn, sim_mat)
+            tmp = cal(c, gn, sim_mat)
+            neigh_sim[c].append((gn, tmp))
+            if tmp:
+                sum_s += tmp
+        if sum_s > 0.0:
+            flag = True
         sum_s /= len(good_neigh[bad_one])  # 候选标名和坏名字的好邻居们的平均相似度
         res[c] = sum_s
-    return res, True
+    if flag:
+        return res, True, neigh_sim
+    return candidate, False, neigh_sim
 
 
 def weighting(before, after, multiple ,ratio):  # simrank之前结果字典，simrank之后结果字典，之后所占加权系数
@@ -67,14 +85,74 @@ def weighting(before, after, multiple ,ratio):  # simrank之前结果字典，si
     return res
 
 
+def alias(name):
+    res = set()
+    if name == '不稳定性心绞痛' or name == '增强型心绞痛':
+        res.add('不稳定性心绞痛')
+        res.add('增强型心绞痛')
+    elif name == '冠状动脉痉挛' or name == '变异型心绞痛':
+        res.add('冠状动脉痉挛')
+        res.add('变异型心绞痛')
+    else:
+        res.add(name)
+    return res
+
+
 def verdict(l, label, top_k):
-    if top_k == 1:
-        if len(l) > 1 and l[1][1] == l[0][1]:
-            return label == l[1][0] or label == l[0][0]
-        return label == l[0][0]
+    # if top_k == 1:
+    #     if len(l) > 1 and l[1][1] == l[0][1]:
+    #         return label == l[1][0] or label == l[0][0]
+    #     return label == l[0][0]
     r = min(top_k, len(l))
     tmp_l = [l[i][0] for i in range(r)]
-    return label in tmp_l
+    tmp = alias(label)
+    for t in tmp:
+        if t in tmp_l:
+            return True
+    return False
+
+
+def print_right_log(right_file, bad_name, before, after, label, cnt):  # 把之前分错而simrank分对的记录打印到正确日志中
+    right_file.writelines(str(cnt) + '\n')
+    right_file.writelines('非标准疾病名称：\n')
+    right_file.writelines(bad_name + '\n')
+    right_file.writelines("simrank之前：\n")
+    for x in range(len(before)):
+        right_file.writelines(before[x][0] + " : " + str(before[x][1]) + '\n')
+    right_file.writelines("---------------------------------------------------\n")
+    right_file.writelines("simrank之后：\n")
+    for x in range(len(after)):
+        right_file.writelines(after[x][0] + " : " + str(after[x][1]) + '\n')
+    right_file.writelines("---------------------------------------------------\n")
+    right_file.writelines("正确答案:\n")
+    right_file.writelines(label + '\n')
+    right_file.writelines("=================================================\n")
+
+
+def print_wrong_log(wrong_file, bad_name, before, after, label, cnt, neigh_sim):  # 把之前分对而simrank分错的记录打印到错误日志中
+    wrong_file.writelines(str(cnt) + '\n')
+    wrong_file.writelines('非标准疾病名称：\n')
+    wrong_file.writelines(bad_name + '\n')
+    wrong_file.writelines("simrank之前：\n")
+    for x in range(len(before)):
+        wrong_file.writelines(before[x][0] + " : " + str(before[x][1]) + '\n')
+    wrong_file.writelines("---------------------------------------------------\n")
+    wrong_file.writelines("simrank之后：\n")
+    for x in range(len(after)):
+        wrong_file.writelines("候选" + str(x + 1) + " --> ")
+        wrong_file.writelines(after[x][0] + " : " + str(after[x][1]) + '\n')
+        wrong_file.writelines("***************************************************\n")
+        neigh = neigh_sim[after[x][0]]
+        l = len(neigh)
+        for i in range(l):
+            wrong_file.writelines("邻居" + str(i + 1) + " --> ")
+            wrong_file.writelines(neigh[i][0] + " : " + str(neigh[i][1]) + '\n')
+        wrong_file.writelines("***************************************************\n")
+    wrong_file.writelines("---------------------------------------------------\n")
+    wrong_file.writelines("正确答案:\n")
+    wrong_file.writelines(label + '\n')
+    wrong_file.writelines("=================================================\n")
+
 
 if __name__ == "__main__":
 
@@ -105,8 +183,8 @@ if __name__ == "__main__":
 
     G = {}
     bad_names = {}  # 存储非标准疾病名称和它的标准疾病名称邻居们
-    appear = {}
-    co_appear = {}
+    appear = {}  # 单个标准疾病名称出现次数
+    co_appear = {}  # <标准疾病名称1, 标准疾病名称2> 出现次数
     for t in records:
         link = set()  # 这条记录中的标准名称集合
         bad = set()  # 这条记录中的非标准名称集合
@@ -170,7 +248,8 @@ if __name__ == "__main__":
     s.sim_rank()
     res = s.get_result()
 
-    # s.print_result("texts/out/similarity.txt")
+    s.print_result("texts/out/similarity.txt")
+
     end_time = datetime.datetime.now()
     print '节点数: %d' % len(s.nodes)
     print 'sim_rank运行时间为%d' % (end_time - start_time).seconds
@@ -178,7 +257,11 @@ if __name__ == "__main__":
     cnt_before = 0
     cnt_after = 0
     cnt_weighted = 0
+    cnt_noise = 0
+    cnt_correct = 0
     f = open("texts/out/sim_rank_result.txt", "w")
+    wrong = open("texts/out/sim_rank_wrong.txt", "w")
+    right = open("texts/out/sim_rank_right.txt", "w")
     start_time = datetime.datetime.now()
     TopK = 1
     for row in values:
@@ -194,7 +277,7 @@ if __name__ == "__main__":
 
         if len(name_dict) != 0:
             if normalized_name in name_dict.keys():  # map correctly
-                re_rank, checked = classify(unnormalized_name, name_dict, bad_names, res)
+                re_rank, checked, neigh_sim = classify(unnormalized_name, name_dict, bad_names, res)
                 if checked:
                     weighted = weighting(name_dict, re_rank, 1, 0.5)
                     weighted = dic2list(weighted)
@@ -229,8 +312,14 @@ if __name__ == "__main__":
                     if verdict(re_rank, normalized_name, TopK):
                         f.writelines('yes\n')
                         cnt_after += 1
+                        if not flag:
+                            cnt_correct += 1
+                            print_right_log(right, unnormalized_name, rank, re_rank, normalized_name, cnt_correct)
                     else:
                         f.writelines('no\n')
+                        if flag:
+                            cnt_noise += 1
+                            print_wrong_log(wrong, unnormalized_name, rank, re_rank, normalized_name, cnt_noise, neigh_sim)
                     f.writelines('++++++++++++++++++++++++++++++++++++++++++++\n')
                     f.writelines('加权之后结果：\n')
                     f.writelines(weighted[0][0] + '\n')
@@ -255,7 +344,8 @@ if __name__ == "__main__":
     print '加权之后分类正确的个数为 %d' % cnt_weighted
     print '分类运行时间为 %d' % (end_time - start_time).seconds
     f.close()
-
+    wrong.close()
+    right.close()
     # f = codecs.open("bad_names.txt", "w", "utf-8")
     # try:
     #     for b in bad_names:
