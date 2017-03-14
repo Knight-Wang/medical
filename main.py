@@ -154,33 +154,7 @@ def print_wrong_log(wrong_file, bad_name, before, after, label, cnt, neigh_sim):
     wrong_file.writelines("=================================================\n")
 
 
-if __name__ == "__main__":
-
-    d = db.DataBase()
-    values = d.query('select ICD, 疾病名称 from I2025')
-    normal = getNormalNames(values)
-    icd4_dic = getICDTree(normal)
-
-    values = d.query('select 类目编码,类目名称 from Norm3')
-    icd3_dict = {}
-    for row in values:
-        icd3_dict[row[0]] = row[1]
-    start_time = datetime.datetime.now()
-
-    values = d.query('select 手术名称 from heart_surgery')
-    normal_surgery = set()  # 标准手术名称集合
-    for t in values:
-        for s in t:
-            normal_surgery.add(s)
-
-    records = d.query('select S050100, S050200, S050600, S050700, \
-                              S050800, S050900, S051000, S051100, \
-                              S056000, S056100, S056200, \
-                              S050501, S051201, S051301, S051401, \
-                              S051501, S057001, S057101, S057201, \
-                              S057301, S057401 \
-                         from heart_new')
-
+def get_network(records, disease, surgeries):
     G = {}
     bad_names = {}  # 存储非标准疾病名称和它的标准疾病名称邻居们
     appear = {}  # 单个标准疾病名称出现次数
@@ -193,7 +167,7 @@ if __name__ == "__main__":
             now += 1
             if s:
                 if now < 11:
-                    if s in normal:  # 成功匹配
+                    if s in disease:  # 成功匹配
                         link.add(s)
                         if s not in appear:
                             appear[s] = 1
@@ -201,7 +175,7 @@ if __name__ == "__main__":
                     else:  # 未匹配
                         bad.add(s)
                 else:
-                    if s in normal_surgery:
+                    if s in surgeries:
                         link.add(s)
                         if s not in appear:
                             appear[s] = 1
@@ -242,6 +216,36 @@ if __name__ == "__main__":
                     f.writelines(' ' + str(val) + '\n')
     finally:
         f.close()
+    return bad_names
+
+if __name__ == "__main__":
+
+    d = db.DataBase()
+    values = d.query('select ICD, 疾病名称 from I2025')
+    normal_disease = getNormalNames(values)
+    icd4_dic = getICDTree(normal_disease)
+
+    values = d.query('select 类目编码,类目名称 from Norm3')
+    icd3_dict = {}
+    for row in values:
+        icd3_dict[row[0]] = row[1]
+    start_time = datetime.datetime.now()
+
+    values = d.query('select 手术名称 from heart_surgery')
+    normal_surgeries = set()  # 标准手术名称集合
+    for t in values:
+        for s in t:
+            normal_surgeries.add(s)
+
+    medical_records = d.query('select S050100, S050200, S050600, S050700, \
+                              S050800, S050900, S051000, S051100, \
+                              S056000, S056100, S056200, \
+                              S050501, S051201, S051301, S051401, \
+                              S051501, S057001, S057101, S057201, \
+                              S057301, S057401 \
+                         from heart_new')
+
+    bad_names = get_network(medical_records, normal_disease, normal_surgeries)
 
     start_time = datetime.datetime.now()
     s = sr.SimRank(graph_file="texts/out/graph.txt")
@@ -269,11 +273,11 @@ if __name__ == "__main__":
         normalized_name = row[1].strip()
         p_name = process(unnormalized_name)
 
-        name_dict, match_type = getMappingResult(p_name, normal)
+        name_dict, match_type = getMappingResult(p_name, normal_disease)
         if match_type != 4:  # 精确匹配和半精确匹配
-            name_dict = addFatherNode(p_name, name_dict, icd3_dict, normal)
+            name_dict = addFatherNode(p_name, name_dict, icd3_dict, normal_disease)
         else:
-            name_dict = addFatherAndBrotherNodes(p_name, name_dict, icd3_dict, icd4_dic, normal)
+            name_dict = addFatherAndBrotherNodes(p_name, name_dict, icd3_dict, icd4_dic, normal_disease)
 
         if len(name_dict) != 0:
             if normalized_name in name_dict.keys():  # map correctly
