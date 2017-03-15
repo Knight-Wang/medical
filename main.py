@@ -154,12 +154,33 @@ def print_wrong_log(wrong_file, bad_name, before, after, label, cnt, neigh_sim):
     wrong_file.writelines("=================================================\n")
 
 
-def get_network(records, disease, surgeries):
+def is_very_similar(bad_name, normal_d, similar_log_file, not_similar_log_file, none_similar_log_file):
+    bad_name = bad_name.strip()
+    p = process(bad_name)
+    name_dict, match_type = getMappingResult(p, normal_d)
+    if not name_dict:
+        none_similar_log_file.writelines(bad_name + "\n")
+        return None
+    name_list = dic2list(name_dict)
+    if name_list[0][1] > 0.857:
+        similar_log_file.writelines(bad_name + " : " + name_list[0][0] + " -> " + str(name_list[0][1]) + '\n')
+        return name_list[0][0]
+    not_similar_log_file.writelines(bad_name + "\n")
+    return None
+
+
+def get_network(records, disease, surgeries, similar_log_file, not_similar_log_file, none_similar_log_file):
     G = {}
     bad_names = {}  # 存储非标准疾病名称和它的标准疾病名称邻居们
     appear = {}  # 单个标准疾病名称出现次数
     co_appear = {}  # <标准疾病名称1, 标准疾病名称2> 出现次数
+    cache = {}  # 基本可以确定的<非标准名称, 标准名称> 字典
+    cnt_row = 0
     for t in records:
+        cnt_row += 1
+        if cnt_row % 10 == 0:
+            print "第 %d 行" % cnt_row
+            print "cache大小 %d" % len(cache)
         link = set()  # 这条记录中的标准名称集合
         bad = set()  # 这条记录中的非标准名称集合
         now = 0
@@ -173,7 +194,23 @@ def get_network(records, disease, surgeries):
                             appear[s] = 1
                         appear[s] += 1
                     else:  # 未匹配
-                        bad.add(s)
+                        if s in cache.keys():
+                            ans = cache[s]
+                            link.add(ans)
+                            if ans not in appear:
+                                appear[ans] = 1
+                            appear[ans] += 1
+                        else:
+                            # print 'fuck'
+                            tmp = is_very_similar(s, disease, similar_log_file, not_similar_log_file, none_similar_log_file)
+                            if tmp:
+                                link.add(tmp)
+                                if tmp not in appear:
+                                    appear[tmp] = 1
+                                appear[tmp] += 1
+                                cache[s] = tmp
+                            else:
+                                bad.add(s)
                 else:
                     if s in surgeries:
                         link.add(s)
@@ -218,6 +255,15 @@ def get_network(records, disease, surgeries):
         f.close()
     return bad_names
 
+
+def filter_map_well(bad_name, can_dict, map_right_file):
+    tmp_l = dic2list(can_dict)
+    if tmp_l[0][1] > 0.857:
+        map_right_file.writelines(bad_name + " : " + tmp_l[0][0] + " -> " + str(tmp_l[0][1]) + '\n')
+        return True
+    return False
+
+
 if __name__ == "__main__":
 
     d = db.DataBase()
@@ -245,7 +291,17 @@ if __name__ == "__main__":
                               S057301, S057401 \
                          from heart_new')
 
-    bad_names = get_network(medical_records, normal_disease, normal_surgeries)
+    similar_log = open("texts/out/similar_log.txt", "w")
+    not_similar_log = open("texts/out/not_similar_log.txt", "w")
+    none_similar_log = open("texts/out/none_similar_log.txt", "w")
+    start_time = datetime.datetime.now()
+    print "开始构建伴病网络"
+    bad_names = get_network(medical_records, normal_disease, normal_surgeries, similar_log, not_similar_log, none_similar_log)
+    end_time = datetime.datetime.now()
+    print "构建伴病网络时间为 %d秒" % (end_time - start_time).seconds
+    similar_log.close()
+    not_similar_log.close()
+    none_similar_log.close()
 
     start_time = datetime.datetime.now()
     s = sr.SimRank(graph_file="texts/out/graph.txt")
@@ -266,6 +322,7 @@ if __name__ == "__main__":
     f = open("texts/out/sim_rank_result.txt", "w")
     wrong = open("texts/out/sim_rank_wrong.txt", "w")
     right = open("texts/out/sim_rank_right.txt", "w")
+    map_right_f = open("texts/out/map_right.txt", "w")
     start_time = datetime.datetime.now()
     TopK = 1
     for row in values:
@@ -281,6 +338,9 @@ if __name__ == "__main__":
 
         if len(name_dict) != 0:
             if normalized_name in name_dict.keys():  # map correctly
+                ok = filter_map_well(unnormalized_name, name_dict, map_right_f)
+                if ok:
+                    continue
                 re_rank, checked, neigh_sim = classify(unnormalized_name, name_dict, bad_names, res)
                 if checked:
                     weighted = weighting(name_dict, re_rank, 1, 0.5)
@@ -350,6 +410,7 @@ if __name__ == "__main__":
     f.close()
     wrong.close()
     right.close()
+    map_right_f.close()
     # f = codecs.open("bad_names.txt", "w", "utf-8")
     # try:
     #     for b in bad_names:
