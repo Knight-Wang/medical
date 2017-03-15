@@ -216,7 +216,7 @@ def get_network(records, disease, surgeries, similar_log_file, not_similar_log_f
                         if s not in appear:
                             appear[s] = 1
                         appear[s] += 1
-        for b in bad:  # 给“坏”名字添加“好”邻居
+        for b in bad:  #  给“坏”名字添加“好”邻居
             if b not in bad_names:
                 bad_names[b] = set()
             for l in link:
