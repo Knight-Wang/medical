@@ -169,54 +169,38 @@ def is_very_similar(bad_name, normal_d, similar_log_file, not_similar_log_file, 
     return None
 
 
-def get_network(records, disease, surgeries, similar_log_file, not_similar_log_file, none_similar_log_file):
+def get_network(records, disease, surgeries):
     G = {}
     bad_names = {}  # 存储非标准疾病名称和它的标准疾病名称邻居们
     appear = {}  # 单个标准疾病名称出现次数
     co_appear = {}  # <标准疾病名称1, 标准疾病名称2> 出现次数
-    # cache = {}  # 基本可以确定的<非标准名称, 标准名称> 字典
     cnt_row = 0
     for t in records:
         cnt_row += 1
         if cnt_row % 10000 == 0:
             print "第 %d 行" % cnt_row
-        # print "cache大小 %d" % len(cache)
         link = set()  # 这条记录中的标准名称集合
         bad = set()  # 这条记录中的非标准名称集合
         now = 0
         for s in t:
             now += 1
-            if s:
-                if now < 11:
-                    if s in disease:  # 成功匹配
-                        link.add(s)
-                        if s not in appear:
-                            appear[s] = 1
-                        appear[s] += 1
-                    else:  # 未匹配
-                        # if s in cache.keys():
-                        #     ans = cache[s]
-                        #     link.add(ans)
-                        #     if ans not in appear:
-                        #         appear[ans] = 1
-                        #     appear[ans] += 1
-                        # else:
-                        #     tmp = is_very_similar(s, disease, similar_log_file, not_similar_log_file, none_similar_log_file)
-                        #     if tmp:
-                        #         link.add(tmp)
-                        #         if tmp not in appear:
-                        #             appear[tmp] = 1
-                        #         appear[tmp] += 1
-                        #         cache[s] = tmp
-                        #     else:
-                                bad.add(s)
-                else:
-                    if s in surgeries:
-                        link.add(s)
-                        if s not in appear:
-                            appear[s] = 1
-                        appear[s] += 1
-        for b in bad:  #  给“坏”名字添加“好”邻居
+            if not s:
+                continue
+            if now < 11:  # 疾病名称
+                if s in disease:  # 成功匹配
+                    link.add(s)
+                    if s not in appear:
+                        appear[s] = 1
+                    appear[s] += 1
+                else:  # 未匹配
+                    bad.add(s)
+            else:  # 手术名称
+                if s in surgeries:
+                    link.add(s)
+                    if s not in appear:
+                        appear[s] = 1
+                    appear[s] += 1
+        for b in bad:  # 给“坏”名字添加“好”邻居
             if b not in bad_names:
                 bad_names[b] = set()
             for l in link:
@@ -242,14 +226,15 @@ def get_network(records, disease, surgeries, similar_log_file, not_similar_log_f
         f.writelines(str(len(G.keys())) + '\n')
         for x in G:
             tmp = x
-            if len(G[x]):
-                f.writelines(tmp + ' ' + str(len(G[x])) + '\n')
-                for y in G[x]:
-                    f.writelines(y)
-                    a = min(x, y)
-                    b = max(x, y)
-                    val = co_appear[(a, b)]
-                    f.writelines(' ' + str(val) + '\n')
+            if not len(G[x]):
+                continue
+            f.writelines(tmp + ' ' + str(len(G[x])) + '\n')
+            for y in G[x]:
+                f.writelines(y)
+                a = min(x, y)
+                b = max(x, y)
+                val = co_appear[(a, b)] * 1.0 / appear[x]
+                f.writelines(' ' + str(val) + '\n')
     finally:
         f.close()
     return bad_names
@@ -290,17 +275,11 @@ if __name__ == "__main__":
                               S057301, S057401 \
                          from heart_new')
 
-    similar_log = open("texts/out/similar_log.txt", "w")
-    not_similar_log = open("texts/out/not_similar_log.txt", "w")
-    none_similar_log = open("texts/out/none_similar_log.txt", "w")
     start_time = datetime.datetime.now()
     print "开始构建伴病网络"
-    bad_names = get_network(medical_records, normal_disease, normal_surgeries, similar_log, not_similar_log, none_similar_log)
+    bad_names = get_network(medical_records, normal_disease, normal_surgeries)
     end_time = datetime.datetime.now()
     print "构建伴病网络时间为 %d秒" % (end_time - start_time).seconds
-    similar_log.close()
-    not_similar_log.close()
-    none_similar_log.close()
 
     start_time = datetime.datetime.now()
     s = sr.SimRank(graph_file="texts/out/graph.txt")

@@ -39,7 +39,7 @@ class SimRank(object):
                 edges -= 1
                 out = f.readline().split()
                 out_neighbor = out[0]
-                degree = int(out[1].decode('utf-8'))
+                degree = float(out[1].decode('utf-8'))
                 if out_neighbor in self.nodes_index:
                     out_neighbor_id = self.nodes_index[out_neighbor]
                 else:
