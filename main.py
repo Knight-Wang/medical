@@ -78,10 +78,16 @@ def classify(bad_one, candidate, good_neigh, sim_mat):
     return candidate, False, neigh_sim
 
 
-def weighting(before, after, multiple ,ratio):  # simrank之前结果字典，simrank之后结果字典，之后所占加权系数
+def weighting(before, after, ratio):  # simrank之前结果字典，simrank之后结果字典，之后所占加权系数
+    max_val = max(val for val in after.itervalues())
+    if max_val < 1e-5:
+        return before
+    tmp = {}
+    for (k, v) in after.iteritems():
+        tmp[k] = v / max_val
     res = copy.copy(before)
     for k in res.iterkeys():
-        res[k] = res[k] * (1.0 - ratio) + after[k] * multiple * ratio
+        res[k] = res[k] * (1.0 - ratio) + tmp[k] * ratio
     return res
 
 
@@ -321,7 +327,7 @@ if __name__ == "__main__":
                     continue
                 re_rank, checked, neigh_sim = classify(unnormalized_name, name_dict, bad_names, res)
                 if checked:
-                    weighted = weighting(name_dict, re_rank, 1, 0.5)
+                    weighted = weighting(name_dict, re_rank, 0.5)
                     weighted = dic2list(weighted)
                 re_rank = dic2list(re_rank)
                 f.writelines(str(unnormalized_name) + ':\n')
