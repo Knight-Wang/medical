@@ -10,9 +10,9 @@ import pypinyin, Levenshtein
 reload(sys)
 sys.setdefaultencoding('utf8')
 
-def loadAlias():
-    file = open("./Alias.txt")
-    alias = {}
+def loadDict(filename):
+    file = open(filename)
+    res = {}
 
     while 1:
         line = file.readline().strip()
@@ -21,11 +21,18 @@ def loadAlias():
 
         n1 = line.split(" ")[0]
         n2 = line.split(" ")[1]
-        alias[n1.decode("utf-8")] = n2.decode("utf-8")
-        alias[n2.decode("utf-8")] = n1.decode("utf-8")
-    return alias
+        res[n1.decode("utf-8")] = n2.decode("utf-8")
+        res[n2.decode("utf-8")] = n1.decode("utf-8")
+    return res
 
 def process(str):
+    acronym = loadDict("./Dict/Acronym.txt") # 载入缩写字典
+    keys = acronym.keys()
+
+    for k in keys:
+        if str.find(k) != -1:
+            str = re.sub(k, acronym[k], str)
+
     res_0 = str.replace('&nbsp;', ' ')
     res_0 = re.sub(ur"\u3000",' ', res_0)   # 将中文的空格用英文空格代替，后面可以处理
     res_0 = re.sub(r"\w\d+.\d+", '', res_0) # 去除掉ICD编码 eg:I20.222
@@ -53,6 +60,21 @@ def getICDTree(normal):
         else:
             icd4_dict[icd4].append((name, icd6))
     return icd4_dict
+
+def addBrotherNodes(segs, name_dict, icd4_dic, icd6_dict ):
+    res = {}
+
+    for name, sim in name_dict.iteritems():
+        icd4 = icd6_dict[name][:5]
+        res[name] = sim
+
+        brothernodes = icd4_dic[icd4]
+
+        for (brothernode,icd) in brothernodes:
+            sim_b, contain_flag = sim_segs_entity(segs, brothernode)
+            if sim_b >= 0.70 or contain_flag:
+                res[brothernode] = sim_b
+    return res
 
 def addFatherAndBrotherNodes(segs, name_dict, icd3_dic, icd4_dic, icd6_dict ):
     res = {}
@@ -95,12 +117,16 @@ def sim_segs_entity(segs, e):
 
     sp = pypinyin.lazy_pinyin(name_str)
     tp = pypinyin.lazy_pinyin(e)
+
     sp_str = "".join(sp)
     tp_str = "".join(tp)
-    if sp_str.find(tp_str) != -1:  # 针对标准疾病名称后面跟随了一个附加语的情况，eg"不稳定型心绞痛心脏扩大心功能Ⅲ级"
-        # if sp_str.find("bu" + tp_str) == -1:
-            contain_entity = True
 
+    s_w = getWords(name_str)
+    e_w = getWords(e)
+    intersect = [p for p in s_w if p in e_w]
+
+    if sp_str.find(tp_str) != -1 or len(intersect) == len(e_w):
+        contain_entity = True
     sim_s = max(sim_words(name_str, e), sim_pinyin(name_str, e))
 
     sim_seg_w = 0
@@ -135,10 +161,23 @@ def remove_location(segs):
         res.append(seg_)
     return res
 
+def determineContain(target, pattern):
+    if target.find(pattern) != -1:
+        flag = True
+    else:
+        tar_w = getWords(target)
+        pattern_w = getWords(pattern)
+        intersect_set = [p for p in tar_w if p in pattern_w]
+        if len(intersect_set) == len(pattern_w):
+            flag = True
+        else:
+            flag = False
+    return flag
+
 def getMappingResult(name_segs, normalized_dic): #return name, flag(compute_brother_nodes)
     name_str = "".join(name_segs)
     res = dict()
-    alias = loadAlias()
+    alias = loadDict("./Dict/Alias.txt")
     load_alias_flag = True
 
     # 精确匹配
@@ -149,19 +188,20 @@ def getMappingResult(name_segs, normalized_dic): #return name, flag(compute_brot
         return res, 1
 
     # 判断待消歧疾病名称(mention)是否包含部位
-    location = re.findall(ur"[上下左右正前后侧][间壁室]", name_str)
+    location_pattern = ur"[上下左右正前后侧][间壁室]"
+    location = re.findall(location_pattern, name_str)
 
     if len(location) != 0:  # 存在部位
         unormalized_rm_segs = remove_location(name_segs)
 
         for disease_name in normalized_dic.keys():
 
-            disease_name_location = re.findall(ur"[上下左右正前后侧][间壁室]", disease_name)
+            disease_name_location = re.findall(location_pattern, disease_name)
             disease_name_rm = disease_name # 去掉部位的标准疾病名称(entity)，若本身不包含部位，即为原标准疾病名
 
             if len(disease_name_location) != 0:
                 # disease_name_rm是去掉了部位的entity名称子串
-                disease_name_rm = re.sub(ur"[上下左右正前后侧][间壁室]", "", disease_name)
+                disease_name_rm = re.sub(location_pattern, "", disease_name)
                 # entity和mention的部位的相似度
                 sim_location = compare_location(location, disease_name_location)
             else:
@@ -176,7 +216,10 @@ def getMappingResult(name_segs, normalized_dic): #return name, flag(compute_brot
                 # sim = sim_location / 3 + 2 * sim_no_location / 3
                 sim = sim_location * 0.3 + 0.7 * sim_no_location
 
+            contain_flag = determineContain(name_str, disease_name) #必须重新赋值，因为前面213行计算的是不包括部位的包含情况
+
             if sim >= 0.70 or contain_flag:
+            # if sim >= 0.70:#对比
                 res[disease_name] = sim
                 if load_alias_flag and disease_name in alias.keys(): # add alias
                     res[alias[disease_name]] = sim
@@ -184,6 +227,10 @@ def getMappingResult(name_segs, normalized_dic): #return name, flag(compute_brot
 
     res_find = {}
     for disease_name in normalized_dic.keys():
+        entity_location = re.findall(location_pattern, disease_name)
+        if len(entity_location) > 0: #对于诊断不含部位，标准名称有部位的情况，直接跳过（因为肯定不映射成功）
+            continue
+
         sim, contain_flag = sim_segs_entity(name_segs, disease_name)
 
         if name_str.find(disease_name) != -1 or contain_flag or sim >= 0.8: # 半精确匹配
@@ -197,8 +244,9 @@ def getMappingResult(name_segs, normalized_dic): #return name, flag(compute_brot
                 res[alias[disease_name]] = sim
 
     if len(res_find) != 0:
-        # for (k,v) in res.items(): #如果在半精确匹配中加入了模糊匹配，会引入大量干扰情况，但对于少量拆分情况，会有提升，如：心绞痛，不稳定性
-        #     res_find[k] = v
+        for (k,v) in res.items(): #如果在半精确匹配中加入了模糊匹配，会引入大量干扰情况，但对于少量拆分情况，会有提升，如：心绞痛，不稳定性
+            if v > 0.7:
+                res_find[k] = v
         return res_find, 2 # 半精确匹配
 
     return res, 4   # 模糊匹配

@@ -7,17 +7,19 @@ import MySQLdb
 reload(sys)
 sys.setdefaultencoding('utf8')
 
-conn = MySQLdb.connect("localhost", "root", "123456", "medical", charset='utf8')
+conn = MySQLdb.connect("localhost", "root", "10081008", "medical", charset='utf8')
 
 cursor = conn.cursor()
 
 # cursor.execute('select 主要编码,疾病名称 from Norm6')
 cursor.execute('select ICD,疾病名称 from I2025')
+# cursor.execute('select ICD,疾病名称 from I2025_New') #更改做的标准疾病6位码库，删除了心绞痛和冠状动脉痉挛性心脏病
 values = cursor.fetchall()
 normal = getNormalNames(values) #(normalized_name, ICD-10)
 icd4_dic = getICDTree(normal)
 
 cursor.execute('select 类目编码,类目名称 from Norm3')
+# cursor.execute('select 类目编码,类目名称 from INorm3')
 values = cursor.fetchall()
 icd3_dict = {}
 for row in values:
@@ -26,7 +28,7 @@ for row in values:
 starttime = datetime.datetime.now()
 
 cursor.execute('select ICD, 非标准名称, 标准疾病名 from LabeledData limit 10000;') #index, unormalized_name
-# cursor.execute('select ICD, 非标准名称, 标准疾病名 from LabeledData where ICD=\'I21.404\';') #index, unormalized_name
+# cursor.execute('select ICD, 非标准名称, 标准疾病名 from LabeledData where ICD=\'I21.9001\';') #index, unormalized_name
 
 values = cursor.fetchall()
 
@@ -63,10 +65,14 @@ for row in values:
         name_dict, match_type = getMappingResult(p_name, normal)
         match_type_distr[match_type - 1] += 1
 
-        if match_type != 4: # 精确匹配和半精确匹配，加入父亲疾病节点
-            name_dict = addFatherNode(p_name, name_dict, icd3_dict, normal)
-        else: # 针对部位的语义匹配和模糊匹配，加入父亲和兄弟节点疾病
-            name_dict = addFatherAndBrotherNodes(p_name, name_dict, icd3_dict, icd4_dic, normal)
+        # if match_type != 4: # 精确匹配和半精确匹配，加入父亲疾病节点
+        #     name_dict = addFatherNode(p_name, name_dict, icd3_dict, normal)
+        # else: # 针对部位的语义匹配和模糊匹配，加入父亲和兄弟节点疾病
+        #     name_dict = addFatherAndBrotherNodes(p_name, name_dict, icd3_dict, icd4_dic, normal)
+
+        #不加父节点
+        if match_type == 4:
+            name_dict = addBrotherNodes(p_name, name_dict, icd4_dic, normal)
 
         # name_dict is the candidate set(name : sim)
         len_candidates = len(name_dict)
@@ -100,7 +106,7 @@ for row in values:
                     # top 1
                     candidate_top_k.append(sort_name_list[0][0])
 
-                    # 针对两个标准疾病名称的相似度并列第一情况(可能别名情况下，两个疾病的相似度相同)
+                    # # 针对两个标准疾病名称的相似度并列第一情况(可能别名情况下，两个疾病的相似度相同)
                     # if len_candidates >= 2 and sort_name_list[1][1] == sort_name_list[0][1]:
                     #     candidate_top_k.append(sort_name_list[1][0])
             else:
