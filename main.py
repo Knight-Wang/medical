@@ -174,13 +174,13 @@ def get_network(records, disease, surgeries, similar_log_file, not_similar_log_f
     bad_names = {}  # 存储非标准疾病名称和它的标准疾病名称邻居们
     appear = {}  # 单个标准疾病名称出现次数
     co_appear = {}  # <标准疾病名称1, 标准疾病名称2> 出现次数
-    cache = {}  # 基本可以确定的<非标准名称, 标准名称> 字典
+    # cache = {}  # 基本可以确定的<非标准名称, 标准名称> 字典
     cnt_row = 0
     for t in records:
         cnt_row += 1
-        if cnt_row % 10 == 0:
+        if cnt_row % 10000 == 0:
             print "第 %d 行" % cnt_row
-            print "cache大小 %d" % len(cache)
+        # print "cache大小 %d" % len(cache)
         link = set()  # 这条记录中的标准名称集合
         bad = set()  # 这条记录中的非标准名称集合
         now = 0
@@ -194,22 +194,21 @@ def get_network(records, disease, surgeries, similar_log_file, not_similar_log_f
                             appear[s] = 1
                         appear[s] += 1
                     else:  # 未匹配
-                        if s in cache.keys():
-                            ans = cache[s]
-                            link.add(ans)
-                            if ans not in appear:
-                                appear[ans] = 1
-                            appear[ans] += 1
-                        else:
-                            # print 'fuck'
-                            tmp = is_very_similar(s, disease, similar_log_file, not_similar_log_file, none_similar_log_file)
-                            if tmp:
-                                link.add(tmp)
-                                if tmp not in appear:
-                                    appear[tmp] = 1
-                                appear[tmp] += 1
-                                cache[s] = tmp
-                            else:
+                        # if s in cache.keys():
+                        #     ans = cache[s]
+                        #     link.add(ans)
+                        #     if ans not in appear:
+                        #         appear[ans] = 1
+                        #     appear[ans] += 1
+                        # else:
+                        #     tmp = is_very_similar(s, disease, similar_log_file, not_similar_log_file, none_similar_log_file)
+                        #     if tmp:
+                        #         link.add(tmp)
+                        #         if tmp not in appear:
+                        #             appear[tmp] = 1
+                        #         appear[tmp] += 1
+                        #         cache[s] = tmp
+                        #     else:
                                 bad.add(s)
                 else:
                     if s in surgeries:
