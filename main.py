@@ -172,11 +172,29 @@ def is_very_similar(bad_name, normal_d, similar_log_file, not_similar_log_file, 
     return None
 
 
+def load_normal_name_dict():
+    f = open("./Dict/Alias.txt", "r")
+    res = {}
+    try:
+        while True:
+            line = f.readline().strip()
+            if not line:
+                break
+            names = line.split(" ")
+            normal = names[0].decode("utf-8")
+            for e in names:
+                res[e.decode("utf-8")] = normal
+    finally:
+        f.close()
+    return res
+
+
 def get_network(records, disease, surgeries):
     G = {}
     bad_names = {}  # 存储非标准疾病名称和它的标准疾病名称邻居们
     appear = {}  # 单个标准疾病名称出现次数
     co_appear = {}  # <标准疾病名称1, 标准疾病名称2> 出现次数
+    alias_dict = load_normal_name_dict()  # 别名字典，把别名都映射成一个确定的标准疾病名称
     cnt_row = 0
     for t in records:
         cnt_row += 1
@@ -192,10 +210,13 @@ def get_network(records, disease, surgeries):
             if now < 11:  # 疾病名称
                 if s in disease:  # 成功匹配
                     # 在这里解决别名问题
-                    link.add(s)
-                    if s not in appear:
-                        appear[s] = 1
-                    appear[s] += 1
+                    n = copy.copy(s)
+                    if s in alias_dict:
+                        n = alias_dict[s]
+                    link.add(n)
+                    if n not in appear:
+                        appear[n] = 1
+                    appear[n] += 1
                 else:  # 未匹配
                     bad.add(s)
             else:  # 手术名称
