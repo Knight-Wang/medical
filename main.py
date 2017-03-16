@@ -11,13 +11,6 @@ reload(sys)
 sys.setdefaultencoding('utf8')
 
 
-def is_normal(l, n):
-    for x in l:
-        if x in n:
-            return x
-    return None
-
-
 def transform(x):
     if isinstance(x, unicode):
         return x.decode('utf-8')
@@ -51,12 +44,6 @@ def classify(bad_one, candidate, good_neigh, sim_mat):
         return candidate, False, None
     if can_list[0][1] > 0.857:  # 减小噪声，如果排名第一的候选相似度很高（大于0.857），就不再进行sim_rank
         return candidate, False, None
-    # top_sim = can_list[0][1]
-    # i = 1
-    # while i < len(can_list) and abs(can_list[i][1] - top_sim) < 1e-6:
-    #     i += 1
-    # if i == 1:
-    #     return candidate, False
     flag = False
     for c, sim in can_list:
         neigh_sim[c] = []
@@ -208,7 +195,7 @@ def get_network(records, disease, surgeries):
             if not s:
                 continue
             if now < 11:  # 疾病名称
-                if s in disease:  # 成功匹配
+                if s in disease:
                     # 在这里解决别名问题
                     n = copy.copy(s)
                     if s in alias_dict:
@@ -414,31 +401,3 @@ if __name__ == "__main__":
     wrong.close()
     right.close()
     map_right_f.close()
-    # f = codecs.open("bad_names.txt", "w", "utf-8")
-    # try:
-    #     for b in bad_names:
-    #         tmp = b
-    #         cnt = len(bad_names[b])
-    #         if cnt:
-    #             tmp += ' '
-    #             i = 0
-    #             for gn in bad_names[b]:
-    #                 tmp += gn
-    #                 if i != cnt - 1:
-    #                     tmp += ' '
-    #                 i += 1
-    #         f.writelines(tmp + '\n')
-    # finally:
-    #     f.close()
-
-    # f = open("bad_guys.txt", "w")
-    # res = sorted(total_bad.iteritems(), key=lambda d: d[1], reverse=True)
-    # try:
-    #     for x in res:
-    #         tmp = ''
-    #         tmp += x[0]
-    #         tmp += ' '
-    #         tmp += str(x[1])
-    #         f.writelines(tmp + '\n')
-    # finally:
-    #     f.close()
