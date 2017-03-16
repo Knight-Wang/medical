@@ -48,14 +48,29 @@ def classify(bad_one, candidate, good_neigh, sim_mat):
     for c, sim in can_list:
         neigh_sim[c] = []
         sum_s = 0.0
+        sum_nn = 0.0
+        cnt_s = 0
+        cnt_nn = 0
         for gn in good_neigh[bad_one]:
             tmp = cal(c, gn, sim_mat)
-            neigh_sim[c].append((gn, tmp))
             if tmp:
+                neigh_sim[c].append((gn, tmp))
                 sum_s += tmp
+                cnt_s += 1
+            if gn in sim_mat.keys():
+                for nn in sim_mat[gn]:
+                    tmp = cal(c, nn[0], sim_mat)
+                    if tmp:
+                        neigh_sim[c].append((nn[0], tmp))
+                        sum_nn += tmp
+                        cnt_nn += 1
+        if cnt_s:
+            sum_s /= cnt_s
+        if cnt_nn:
+            sum_nn /= cnt_nn
+        sum_s += sum_nn  # 候选标名和坏名字的好邻居们的平均相似度
         if sum_s > 0.0:
             flag = True
-        sum_s /= len(good_neigh[bad_one])  # 候选标名和坏名字的好邻居们的平均相似度
         res[c] = sum_s
     if flag:
         return res, True, neigh_sim
