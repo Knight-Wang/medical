@@ -51,7 +51,7 @@ unmap_id = 0
 candidate_num = [0,0,0,0,0,0]
 match_type_distr = [0,0,0,0]
 
-topK = 1
+topK = 5
 cnt_sim_k = 0
 
 file = open(dir + "/disambiguate_res.txt", "w")
@@ -106,9 +106,9 @@ for row in values:
                     # top 1
                     candidate_top_k.append(sort_name_list[0][0])
 
-                    # # 针对两个标准疾病名称的相似度并列第一情况(可能别名情况下，两个疾病的相似度相同)
-                    # if len_candidates >= 2 and sort_name_list[1][1] == sort_name_list[0][1]:
-                    #     candidate_top_k.append(sort_name_list[1][0])
+                    # 针对两个标准疾病名称的相似度并列第一情况(可能别名情况下，两个疾病的相似度相同)
+                    if len_candidates >= 2 and sort_name_list[1][1] == sort_name_list[0][1]:
+                        candidate_top_k.append(sort_name_list[1][0])
             else:
                 candidate_top_k = [sort_name_list[i][0] for i in range(len_candidates)]
 
