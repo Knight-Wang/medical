@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import sys
-import datetime
-import re
 import codecs
 import SimRank as sr
 import DataBase as db
@@ -183,7 +180,7 @@ def get_network(records, disease, surgeries):
     cnt_row = 0
     for t in records:
         cnt_row += 1
-        if cnt_row % 10000 == 0:
+        if cnt_row % 100000 == 0:
             print "第 %d 行" % cnt_row
         link = set()  # 这条记录中的标准名称集合
         bad = set()  # 这条记录中的非标准名称集合
@@ -194,6 +191,7 @@ def get_network(records, disease, surgeries):
                 continue
             if now < 11:  # 疾病名称
                 if s in disease:  # 成功匹配
+                    # 在这里解决别名问题
                     link.add(s)
                     if s not in appear:
                         appear[s] = 1
