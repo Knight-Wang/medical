@@ -2,8 +2,9 @@
 visual_graph.py
 
 # txt
-*.txt
-
+/texts/in/
+/texts/out/
+/Experiment_LabeledData/
 # csv
 *.csv
 
