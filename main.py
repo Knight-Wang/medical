@@ -34,7 +34,7 @@ def dic2list(dic):
     return l
 
 
-def classify(bad_one, candidate, good_neigh, sim_mat):
+def classify(bad_one, candidate, good_neigh, sim_mat, ratio):
     res = {}
     neigh_sim = {}
     can_list = dic2list(candidate)
@@ -51,6 +51,7 @@ def classify(bad_one, candidate, good_neigh, sim_mat):
         sum_nn = 0.0
         cnt_s = 0
         cnt_nn = 0
+        neigh2 = set()  # 跳数为2的邻居集合
         for gn in good_neigh[bad_one]:
             tmp = cal(c, gn, sim_mat)
             if tmp:
@@ -59,19 +60,22 @@ def classify(bad_one, candidate, good_neigh, sim_mat):
                 cnt_s += 1
             if gn in sim_mat.keys():
                 for nn in sim_mat[gn]:
-                    tmp = cal(c, nn[0], sim_mat)
-                    if tmp:
-                        neigh_sim[c].append((nn[0], tmp))
-                        sum_nn += tmp
-                        cnt_nn += 1
+                    if nn not in good_neigh[bad_one] and nn != c:
+                        neigh2.add(nn[0])
+        for n2 in neigh2:
+            tmp = cal(c, n2, sim_mat)
+            if tmp:
+                neigh_sim[c].append((n2, tmp))
+                sum_nn += tmp
+                cnt_nn += 1
         if cnt_s:
             sum_s /= cnt_s
         if cnt_nn:
             sum_nn /= cnt_nn
-        sum_s += sum_nn  # 候选标名和坏名字的好邻居们的平均相似度
-        if sum_s > 0.0:
+        sum_all = sum_s * (1 - ratio) + sum_nn * ratio  # 候选标名和坏名字的好邻居们的平均相似度
+        if sum_all > 0.0:
             flag = True
-        res[c] = sum_s
+        res[c] = sum_all
     if flag:
         return res, True, neigh_sim
     return candidate, False, neigh_sim
@@ -269,10 +273,11 @@ def get_network(records, disease, surgeries):
 
 def filter_map_well(bad_name, can_dict, map_right_file):
     tmp_l = dic2list(can_dict)
+    flag = False
     if tmp_l[0][1] > 0.857:
         map_right_file.writelines(bad_name + " : " + tmp_l[0][0] + " -> " + str(tmp_l[0][1]) + '\n')
-        return True
-    return False
+        flag = True
+    return flag
 
 
 if __name__ == "__main__":
@@ -346,9 +351,9 @@ if __name__ == "__main__":
                 ok = filter_map_well(unnormalized_name, name_dict, map_right_f)
                 if ok:
                     continue
-                re_rank, checked, neigh_sim = classify(unnormalized_name, name_dict, bad_names, res)
+                re_rank, checked, neigh_sim = classify(unnormalized_name, name_dict, bad_names, res, 0.6)
                 if checked:
-                    weighted = weighting(name_dict, re_rank, 0.5)
+                    weighted = weighting(name_dict, re_rank, 0.53)
                     weighted = dic2list(weighted)
                 re_rank = dic2list(re_rank)
                 f.writelines(str(unnormalized_name) + ':\n')
