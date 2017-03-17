@@ -38,6 +38,10 @@ def process(str):
     res_0 = re.sub(r"\w\d+.\d+", '', res_0) # 去除掉ICD编码 eg:I20.222
     res_0 = re.sub(r"\s\w+", "", res_0) #去掉空格后的字母，eg: 心肌梗塞急性 NOS
 
+    seperator = ["病", "塞", "死", "症", "痛"]
+    for s in seperator:
+        res_0 = re.sub(ur""+s, s + " ", res_0)
+
     res = re.split(ur"[（ ）\( \)， \. ;、：° \s+ \*\[ \] \+ ？? \,]", res_0)  # 用标点（（，："【】）*）进行切分
     res = filter(lambda x: len(x) != 1 and len(x) != 0, res)
 
@@ -138,26 +142,14 @@ def sim_segs_entity(segs, e):
     return max(sim_s, max(sim_seg_p, sim_seg_w)), contain_entity
 
 def compare_location(l1, l2):
-    l1 = "".join(l1)
-    l2 = "".join(l2)
-    adj1 = re.findall(ur"[上下左右正前后侧]", l1)
-    adj2 = re.findall(ur"[上下左右正前后侧]", l2)
-    adj_intersection = [x for x in adj1 if x in adj2]
-    adj_sim = float(len(adj_intersection)) / (len(adj1))
 
-    if len(adj_intersection) == 0: # 如果位置都不对，直接返回0
-        return 0.0
-
-    part1 = re.findall(ur"[间壁室]", l1)
-    part2 = re.findall(ur"[间壁室]", l2)
-    part_intersection = [x for x in part1 if x in part2]
-    part_sim = float(len(part_intersection)) / (len(part1))
-    return (adj_sim + part_sim) / 2
+    inter = [x for x in l1 if x in l2]
+    return float(len(inter)) / len(l1)
 
 def remove_location(segs):
     res = []
     for seg in segs:
-        seg_ = re.sub(ur"[上下左右正前后侧][间壁室]", "", seg)
+        seg_ = re.sub(ur"[上下左右正前后侧][间壁室]+", "", seg)
         res.append(seg_)
     return res
 
@@ -188,7 +180,7 @@ def getMappingResult(name_segs, normalized_dic): #return name, flag(compute_brot
         return res, 1
 
     # 判断待消歧疾病名称(mention)是否包含部位
-    location_pattern = ur"[上下左右正前后侧][间壁室]"
+    location_pattern = ur"[上下左右正前后侧][间壁室]+"
     location = re.findall(location_pattern, name_str)
 
     if len(location) != 0:  # 存在部位
