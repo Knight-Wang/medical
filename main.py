@@ -351,9 +351,9 @@ if __name__ == "__main__":
                 ok = filter_map_well(unnormalized_name, name_dict, map_right_f)
                 if ok:
                     continue
-                re_rank, checked, neigh_sim = classify(unnormalized_name, name_dict, bad_names, res, 0.6)
+                re_rank, checked, neigh_sim = classify(unnormalized_name, name_dict, bad_names, res, 0.5)
                 if checked:
-                    weighted = weighting(name_dict, re_rank, 0.53)
+                    weighted = weighting(name_dict, re_rank, 0.5)
                     weighted = dic2list(weighted)
                 re_rank = dic2list(re_rank)
                 f.writelines(str(unnormalized_name) + ':\n')

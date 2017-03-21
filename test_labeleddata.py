@@ -7,7 +7,7 @@ import MySQLdb
 reload(sys)
 sys.setdefaultencoding('utf8')
 
-conn = MySQLdb.connect("localhost", "root", "10081008", "medical", charset='utf8')
+conn = MySQLdb.connect("localhost", "root", "123456", "medical", charset='utf8')
 
 cursor = conn.cursor()
 
@@ -51,7 +51,7 @@ unmap_id = 0
 candidate_num = [0,0,0,0,0,0]
 match_type_distr = [0,0,0,0]
 
-topK = 5
+topK = 1
 cnt_sim_k = 0
 
 file = open(dir + "/disambiguate_res.txt", "w")
@@ -65,6 +65,7 @@ for row in values:
         name_dict, match_type = getMappingResult(p_name, normal)
         match_type_distr[match_type - 1] += 1
 
+        alias_dict = loadDict("./Dict/Alias.txt")
         # if match_type != 4: # 精确匹配和半精确匹配，加入父亲疾病节点
         #     name_dict = addFatherNode(p_name, name_dict, icd3_dict, normal)
         # else: # 针对部位的语义匹配和模糊匹配，加入父亲和兄弟节点疾病
@@ -107,13 +108,21 @@ for row in values:
                     candidate_top_k.append(sort_name_list[0][0])
 
                     # 针对两个标准疾病名称的相似度并列第一情况(可能别名情况下，两个疾病的相似度相同)
-                    if len_candidates >= 2 and sort_name_list[1][1] == sort_name_list[0][1]:
-                        candidate_top_k.append(sort_name_list[1][0])
+                    j = 0
+                    top_sim = sort_name_list[0][1]
+                    while j < len_candidates and top_sim == sort_name_list[j][1]:
+                        candidate_top_k.append(sort_name_list[j][0])
+                        j += 1
+                    # if len_candidates >= 2 and sort_name_list[1][1] == sort_name_list[0][1]:
+                    #     candidate_top_k.append(sort_name_list[1][0])
             else:
                 candidate_top_k = [sort_name_list[i][0] for i in range(len_candidates)]
 
-            if normalized_name in candidate_top_k:
+            if normalized_name in alias_dict:
+                if normalized_name in candidate_top_k or alias_dict[normalized_name] in candidate_top_k:
                     cnt_sim_k += 1
+            elif normalized_name in candidate_top_k:
+                cnt_sim_k += 1
             else:
                 str_pair = [k + ":" + str(v) for (k, v) in sort_name_list]
                 writeFile(file, " ".join(p_name), ",".join(str_pair), normalized_name, normalized_id)
