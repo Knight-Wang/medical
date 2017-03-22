@@ -296,7 +296,6 @@ if __name__ == "__main__":
     icd3_dict = {}
     for row in values:
         icd3_dict[row[0]] = row[1]
-    start_time = datetime.datetime.now()
 
     values = d.query('select 手术名称 from heart_surgery')
     normal_surgeries = set()  # 标准手术名称集合
@@ -325,15 +324,15 @@ if __name__ == "__main__":
     print "边数：%d" % cnt_edge
 
     start_time = datetime.datetime.now()
-    # s = sr.SimRank(graph_file="texts/out/graph.txt")
-    # s.sim_rank()
-    # res = s.get_result()
+    s = sr.SimRank(graph_file="texts/out/graph.txt")
+    s.sim_rank()
+    res = s.get_result()
 
-    # s.print_result("texts/out/similarity.txt")
+    s.print_result("texts/out/similarity.txt")
 
-    # end_time = datetime.datetime.now()
-    # print '节点数: %d' % len(s.nodes)
-    # print 'sim_rank运行时间为%d' % (end_time - start_time).seconds
+    end_time = datetime.datetime.now()
+    print '节点数: %d' % len(s.nodes)
+    print 'sim_rank运行时间为%d' % (end_time - start_time).seconds
     values = d.query('select 非标准名称, 标准疾病名 from labeleddata')
     cnt_before = 0
     cnt_after = 0
@@ -352,10 +351,14 @@ if __name__ == "__main__":
         p_name = process(unnormalized_name)
 
         name_dict, match_type = getMappingResult(p_name, normal_disease)
-        if match_type != 4:  # 精确匹配和半精确匹配
-            name_dict = addFatherNode(p_name, name_dict, icd3_dict, normal_disease)
-        else:
-            name_dict = addFatherAndBrotherNodes(p_name, name_dict, icd3_dict, icd4_dic, normal_disease)
+        # if match_type != 4:  # 精确匹配和半精确匹配
+        #     name_dict = addFatherNode(p_name, name_dict, icd3_dict, normal_disease)
+        # else:
+        #     name_dict = addFatherAndBrotherNodes(p_name, name_dict, icd3_dict, icd4_dic, normal_disease)
+
+        # 不加父节点
+        if match_type == 4:
+            name_dict = addBrotherNodes(p_name, name_dict, icd4_dic, normal_disease)
 
         if len(name_dict) != 0:
             if normalized_name in name_dict.keys():  # map correctly
