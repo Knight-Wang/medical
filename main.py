@@ -204,7 +204,7 @@ def get_network(records, disease, surgeries):
     cnt_row = 0
     for t in records:
         cnt_row += 1
-        if cnt_row % 100000 == 0:
+        if cnt_row % 100 == 0:
             print "第 %d 行" % cnt_row
         link = set()  # 这条记录中的标准名称集合
         bad = set()  # 这条记录中的非标准名称集合
@@ -214,15 +214,19 @@ def get_network(records, disease, surgeries):
             if not s:
                 continue
             if now < 11:  # 疾病名称
-                if s in disease:
-                    # 在这里解决别名问题
-                    n = copy.copy(s)
-                    if s in alias_dict:
-                        n = alias_dict[s]
-                    link.add(n)
-                    if n not in appear:
-                        appear[n] = 1
-                    appear[n] += 1
+                segs = process(s)
+                name_dict, type = getMappingResult(segs, disease)
+                if name_dict:
+                    res = dic2list(name_dict)
+                    if res[0][1] > 0.857:  # 可信度比较高
+                        # 在这里解决别名问题
+                        n = copy.copy(res[0][0])
+                        if res[0][0] in alias_dict:
+                            n = alias_dict[res[0][0]]
+                        link.add(n)
+                        if n not in appear:
+                            appear[n] = 1
+                        appear[n] += 1
                 else:  # 未匹配
                     bad.add(s)
             else:  # 手术名称
@@ -266,9 +270,10 @@ def get_network(records, disease, surgeries):
                 b = max(x, y)
                 val = co_appear[(a, b)] * 1.0 / appear[x]
                 f.writelines(' ' + str(val) + '\n')
+            f.writelines("-----------------------------------\n")
     finally:
         f.close()
-    return bad_names
+    return G, bad_names
 
 
 def filter_map_well(bad_name, can_dict, map_right_file):
@@ -305,25 +310,30 @@ if __name__ == "__main__":
                               S050501, S051201, S051301, S051401, \
                               S051501, S057001, S057101, S057201, \
                               S057301, S057401 \
-                         from heart_new')
+                         from heart_new limit 10000')
 
     start_time = datetime.datetime.now()
     print "开始构建伴病网络"
-    bad_names = get_network(medical_records, normal_disease, normal_surgeries)
+    G, bad_names = get_network(medical_records, normal_disease, normal_surgeries)
     end_time = datetime.datetime.now()
     print "构建伴病网络时间为 %d秒" % (end_time - start_time).seconds
+    cnt_node = len(G)
+    cnt_edge = 0
+    for x in G:
+        cnt_edge += len(G[x])
+    print "节点数：%d" % cnt_node
+    print "边数：%d" % cnt_edge
 
-    '''
     start_time = datetime.datetime.now()
-    s = sr.SimRank(graph_file="texts/out/graph.txt")
-    s.sim_rank()
-    res = s.get_result()
+    # s = sr.SimRank(graph_file="texts/out/graph.txt")
+    # s.sim_rank()
+    # res = s.get_result()
 
-    s.print_result("texts/out/similarity.txt")
+    # s.print_result("texts/out/similarity.txt")
 
-    end_time = datetime.datetime.now()
-    print '节点数: %d' % len(s.nodes)
-    print 'sim_rank运行时间为%d' % (end_time - start_time).seconds
+    # end_time = datetime.datetime.now()
+    # print '节点数: %d' % len(s.nodes)
+    # print 'sim_rank运行时间为%d' % (end_time - start_time).seconds
     values = d.query('select 非标准名称, 标准疾病名 from labeleddata')
     cnt_before = 0
     cnt_after = 0
@@ -422,4 +432,4 @@ if __name__ == "__main__":
     wrong.close()
     right.close()
     map_right_f.close()
-    '''
+
