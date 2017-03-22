@@ -218,7 +218,7 @@ def get_network(records, disease, surgeries):
                 name_dict, type = getMappingResult(segs, disease)
                 if name_dict:
                     res = dic2list(name_dict)
-                    if res[0][1] > 0.857:  # 可信度比较高
+                    if res[0][1] > 0.857:  # 可信度比较高，直接认为是标准疾病名称
                         # 在这里解决别名问题
                         n = copy.copy(res[0][0])
                         if res[0][0] in alias_dict:
