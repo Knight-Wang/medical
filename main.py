@@ -28,6 +28,24 @@ def cal(norm1, norm2, sim_rank):
     return None
 
 
+def cal_plus(can_name, neigh, sim_rank):
+    ok1 = transform(can_name)
+    ok2 = transform(neigh)
+    if ok1 not in sim_rank.keys():
+        return None
+    sum = 0.0
+    cnt = 0
+    for tup in range(len(sim_rank[ok1])):
+        can_neigh = sim_rank[ok1][tup][0]
+        tmp = cal(can_neigh, ok2, sim_rank)
+        if tmp:
+            sum += tmp
+            cnt += 1
+    if cnt:
+        return sum / cnt
+    return None
+
+
 def dic2list(dic):
     l = [(k, v) for (k, v) in dic.iteritems()]
     l = sorted(l, cmp=lambda x, y: cmp(x[1], y[1]), reverse=True)
@@ -48,34 +66,18 @@ def classify(bad_one, candidate, good_neigh, sim_mat, ratio):
     for c, sim in can_list:
         neigh_sim[c] = []
         sum_s = 0.0
-        sum_nn = 0.0
         cnt_s = 0
-        cnt_nn = 0
-        neigh2 = set()  # 跳数为2的邻居集合
         for gn in good_neigh[bad_one]:
-            tmp = cal(c, gn, sim_mat)
+            tmp = cal_plus(c, gn, sim_mat)
             if tmp:
                 neigh_sim[c].append((gn, tmp))
                 sum_s += tmp
                 cnt_s += 1
-            if gn in sim_mat.keys():
-                for nn in sim_mat[gn]:
-                    if nn not in good_neigh[bad_one] and nn != c:
-                        neigh2.add(nn[0])
-        for n2 in neigh2:
-            tmp = cal(c, n2, sim_mat)
-            if tmp:
-                neigh_sim[c].append((n2, tmp))
-                sum_nn += tmp
-                cnt_nn += 1
         if cnt_s:
             sum_s /= cnt_s
-        if cnt_nn:
-            sum_nn /= cnt_nn
-        sum_all = sum_s * (1 - ratio) + sum_nn * ratio  # 候选标名和坏名字的好邻居们的平均相似度
-        if sum_all > 0.0:
+        if sum_s > 0.0:
             flag = True
-        res[c] = sum_all
+        res[c] = sum_s
     if flag:
         return res, True, neigh_sim
     return candidate, False, neigh_sim
@@ -214,19 +216,20 @@ def get_network(records, disease, surgeries):
             if not s:
                 continue
             if now < 11:  # 疾病名称
-                segs = process(s)
-                name_dict, type = getMappingResult(segs, disease)
-                if name_dict:
-                    res = dic2list(name_dict)
-                    if res[0][1] > 0.857:  # 可信度比较高，直接认为是标准疾病名称
-                        # 在这里解决别名问题
-                        n = copy.copy(res[0][0])
-                        if res[0][0] in alias_dict:
-                            n = alias_dict[res[0][0]]
-                        link.add(n)
-                        if n not in appear:
-                            appear[n] = 1
-                        appear[n] += 1
+                # segs = process(s)
+                # name_dict, type = getMappingResult(segs, disease)
+                # if name_dict:
+                    # res = dic2list(name_dict)
+                    # if res[0][1] > 0.857:  # 可信度比较高，直接认为是标准疾病名称
+                if s in disease:
+                    # 在这里解决别名问题
+                    n = copy.copy(s)
+                    if s in alias_dict:
+                        n = alias_dict[s]
+                    link.add(n)
+                    if n not in appear:
+                        appear[n] = 1
+                    appear[n] += 1
                 else:  # 未匹配
                     bad.add(s)
             else:  # 手术名称
@@ -270,7 +273,6 @@ def get_network(records, disease, surgeries):
                 b = max(x, y)
                 val = co_appear[(a, b)] * 1.0 / appear[x]
                 f.writelines(' ' + str(val) + '\n')
-            f.writelines("-----------------------------------\n")
     finally:
         f.close()
     return G, bad_names
@@ -309,7 +311,7 @@ if __name__ == "__main__":
                               S050501, S051201, S051301, S051401, \
                               S051501, S057001, S057101, S057201, \
                               S057301, S057401 \
-                         from heart_new limit 10000')
+                         from heart_new')
 
     start_time = datetime.datetime.now()
     print "开始构建伴病网络"
