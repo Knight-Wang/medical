@@ -313,6 +313,7 @@ if __name__ == "__main__":
     end_time = datetime.datetime.now()
     print "构建伴病网络时间为 %d秒" % (end_time - start_time).seconds
 
+    '''
     start_time = datetime.datetime.now()
     s = sr.SimRank(graph_file="texts/out/graph.txt")
     s.sim_rank()
@@ -421,3 +422,4 @@ if __name__ == "__main__":
     wrong.close()
     right.close()
     map_right_f.close()
+    '''
