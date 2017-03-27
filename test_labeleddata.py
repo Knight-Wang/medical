@@ -3,6 +3,8 @@
 
 from Preprocess import *
 import MySQLdb
+from copy import  copy
+import datetime, os
 
 reload(sys)
 sys.setdefaultencoding('utf8')
@@ -21,18 +23,18 @@ icd4_dic = getICDTree(normal)
 cursor.execute('select 类目编码,类目名称 from Norm3')
 # cursor.execute('select 类目编码,类目名称 from INorm3')
 values = cursor.fetchall()
-icd3_dict = {}
+icd3_names = {}
 for row in values:
-    icd3_dict[row[0]] = row[1]
+    icd3_names[row[0]] = row[1]
 
 starttime = datetime.datetime.now()
 
 cursor.execute('select ICD, 非标准名称, 标准疾病名 from LabeledData limit 10000;') #index, unormalized_name
-# cursor.execute('select ICD, 非标准名称, 标准疾病名 from LabeledData where ICD=\'I21.9001\';') #index, unormalized_name
+# cursor.execute('select ICD, 非标准名称, 标准疾病名 from LabeledData where ICD=\'I20.000108\';') #index, unormalized_name
 
 values = cursor.fetchall()
 
-enable_write_candidates = False #是否将消歧结果写入文件
+enable_write_candidates = True #是否将消歧结果写入文件
 dir = "Experiment_LabeledData"
 if os.path.exists(dir) == False:
     os.mkdir(dir)
@@ -51,10 +53,24 @@ unmap_id = 0
 candidate_num = [0,0,0,0,0,0]
 match_type_distr = [0,0,0,0]
 
-topK = 5
+topK = 1
 cnt_sim_k = 0
 
 file = open(dir + "/disambiguate_res.txt", "w")
+alias_dict = loadDict("./Dict/Alias.txt")
+
+icd3_dic = getICD3Tree(normal)
+icd6_keywords = loadICD6Features(normal)
+
+# for icd3, names in icd3_dic.iteritems():
+#     names_dic = {}
+#     for (k,v) in names:
+#         names_dic[k] = v
+#     res = getFeatureEntity(names_dic)
+#     for (k, v) in res.iteritems():
+#         # print(k)
+#         sort_res = sorted(v.items(), key=lambda e: e[1], reverse=True)
+#         icd6_keywords[k] = sort_res
 
 for row in values:
         normalized_id = row[0].strip()
@@ -62,17 +78,18 @@ for row in values:
         normalized_name = row[2].strip()
         p_name = process(unnormalized_name)
 
-        name_dict, match_type = getMappingResult(p_name, normal)
+        name_dict, match_type = getMappingResult(p_name, normal, icd6_keywords) # generate candidates
         match_type_distr[match_type - 1] += 1
 
-        # if match_type != 4: # 精确匹配和半精确匹配，加入父亲疾病节点
-        #     name_dict = addFatherNode(p_name, name_dict, icd3_dict, normal)
-        # else: # 针对部位的语义匹配和模糊匹配，加入父亲和兄弟节点疾病
-        #     name_dict = addFatherAndBrotherNodes(p_name, name_dict, icd3_dict, icd4_dic, normal)
-
-        #不加父节点
+        # Add Brother Node
         if match_type == 4:
-            name_dict = addBrotherNodes(p_name, name_dict, icd4_dic, normal)
+            name_dict = addBrotherNodes(p_name, name_dict, icd4_dic, normal, icd6_keywords)
+
+        # Add Alias
+        dict_copy = copy(name_dict)
+        for (k, v) in dict_copy.iteritems():
+            if k in alias_dict.keys():
+                name_dict[alias_dict[k]] = v
 
         # name_dict is the candidate set(name : sim)
         len_candidates = len(name_dict)
@@ -87,7 +104,8 @@ for row in values:
                     if normalized_name in name_dict.keys(): # map correctly
                         cnt += 1
                         writeFile(crt_file, " ".join(p_name), ",".join(str_pair), normalized_name, normalized_id)
-                    else: # map to a disease name but the name is not the labeled one.
+                    else:
+                    # map to a disease name but the name is not the labeled one.
                         other_nt += 1
                         writeFile(other_file, " ".join(p_name), ",".join(str_pair), normalized_name, normalized_id)
             else: # cannot map
@@ -104,11 +122,14 @@ for row in values:
                     candidate_top_k = [sort_name_list[i][0] for i in range(topK)]
                 else:
                     # top 1
-                    candidate_top_k.append(sort_name_list[0][0])
 
-                    # 针对两个标准疾病名称的相似度并列第一情况(可能别名情况下，两个疾病的相似度相同)
-                    if len_candidates >= 2 and sort_name_list[1][1] == sort_name_list[0][1]:
-                        candidate_top_k.append(sort_name_list[1][0])
+                    tie_tops = getTieTops(sort_name_list)
+                    if(len(tie_tops) > 1):
+                        tie_tops = optimizeTopCandidates(tie_tops, icd3_names, normal)
+                    candidate_top_k.append(tie_tops[0][0])
+
+                    if tie_tops[0][0] in alias_dict.keys(): # 别名情况下，两个疾病的相似度相同
+                            candidate_top_k.append(alias_dict[sort_name_list[0][0]])
             else:
                 candidate_top_k = [sort_name_list[i][0] for i in range(len_candidates)]
 
