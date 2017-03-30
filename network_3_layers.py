@@ -104,7 +104,9 @@ def get_graph(normal_diseases, normal_surgeries, medical_records):
     single_times = {}
     G = nx.DiGraph()
     for t in medical_records:
-        link = set()
+        main_dis = ''  # 主诊断
+        vice_dis = set()  # 副诊断集合
+        surgeries = set()  # 手术集合
         now = 0
         for s in t:
             now += 1
@@ -112,8 +114,12 @@ def get_graph(normal_diseases, normal_surgeries, medical_records):
                 continue
             if now <= 11:
                 if s in normal_diseases:
-                    G.add_node(s, Type='dis')
-                    link.add(s)
+                    if now == 1:
+                        G.add_node(s, Type='main_dis')
+                        main_dis = s
+                    else:
+                        G.add_node(s, Type='vice_dis')
+                        vice_dis.add(s)
                     total_disease.add(s)
                     if s not in single_times:
                         single_times[s] = 1
@@ -121,19 +127,28 @@ def get_graph(normal_diseases, normal_surgeries, medical_records):
             else:
                 if s in normal_surgeries:
                     G.add_node(s, Type='sur')
-                    link.add(s)
+                    surgeries.add(s)
                     total_surgeries.add(s)
                     if s not in single_times:
                         single_times[s] = 1
                     single_times[s] += 1
-        for x in link:
-            for y in link:
-                if x < y:
-                    tmp = (x, y)
-                    if tmp in union_times:
-                        union_times[tmp] += 1
-                    else:
-                        union_times[tmp] = 1
+
+        if not main_dis:
+            continue
+
+        for v in vice_dis:  # 添加主诊断和副诊断之间的边
+            tmp = (min(main_dis, v), max(main_dis, v))
+            if tmp in union_times:
+                union_times[tmp] += 1
+            else:
+                union_times[tmp] = 1
+
+        for s in surgeries:  # 添加主诊断和手术之间的边
+            tmp = (min(main_dis, s), max(main_dis, s))
+            if tmp in union_times:
+                union_times[tmp] += 1
+            else:
+                union_times[tmp] = 1
 
     print '已经识别的疾病种类数为 %d' % len(total_disease)
     print '已经识别的手术种类数为 %d' % len(total_surgeries)
