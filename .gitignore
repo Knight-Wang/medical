@@ -5,6 +5,7 @@ visual_graph.py
 /texts/in/
 /texts/out/
 /Experiment_LabeledData/
+/neighbour_test_texts/
 # csv
 *.csv
 
