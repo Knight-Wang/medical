@@ -46,7 +46,7 @@ def init():
 
 def write_nodes(G, not_single):
     """ 将伴病网络的节点写入文件
-    :param G: 伴病网络字典，使用networkx实现
+    :param G: 伴病网络字典，使用 networkx 实现
     :return: 无
     """
 
@@ -103,8 +103,9 @@ def get_graph(normal_diseases, normal_surgeries, medical_records):
     union_times = {}
     single_times = {}
     G = nx.DiGraph()
+
     for t in medical_records:
-        main_dis = ''  # 主诊断
+        one_main_dis = ''  # 主诊断
         vice_dis = set()  # 副诊断集合
         surgeries = set()  # 手术集合
         now = 0
@@ -116,7 +117,7 @@ def get_graph(normal_diseases, normal_surgeries, medical_records):
                 if s in normal_diseases:
                     if now == 1:
                         G.add_node(s, Type='main_dis')
-                        main_dis = s
+                        one_main_dis = s
                     else:
                         G.add_node(s, Type='vice_dis')
                         vice_dis.add(s)
@@ -133,18 +134,18 @@ def get_graph(normal_diseases, normal_surgeries, medical_records):
                         single_times[s] = 1
                     single_times[s] += 1
 
-        if not main_dis:
+        if not one_main_dis:
             continue
 
         for v in vice_dis:  # 添加主诊断和副诊断之间的边
-            tmp = (min(main_dis, v), max(main_dis, v))
+            tmp = (min(one_main_dis, v), max(one_main_dis, v))
             if tmp in union_times:
                 union_times[tmp] += 1
             else:
                 union_times[tmp] = 1
 
         for s in surgeries:  # 添加主诊断和手术之间的边
-            tmp = (min(main_dis, s), max(main_dis, s))
+            tmp = (min(one_main_dis, s), max(one_main_dis, s))
             if tmp in union_times:
                 union_times[tmp] += 1
             else:
