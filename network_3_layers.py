@@ -37,53 +37,58 @@ def init():
                                        S050501, S051201, S051301, S051401, \
                                        S051501, S057001, S057101, S057201, \
                                        S057301, S057401 \
-                                  from heart_new limit 100000')
+                                  from heart_new limit 50000')
 
     print '医疗记录为 %d 条' % len(medical_records)
 
     return normal_diseases, normal_surgeries, medical_records
 
 
-def write_nodes(G, not_single):
-    """ 将伴病网络的节点写入文件
+def write_G(G, not_single):
+    """ 将伴病网络的写入文件
     :param G: 伴病网络字典，使用 networkx 实现
-    :return: 无
-    """
-
-    nodes = list(G.nodes_iter(data='Type'))
-    f = open("visual_new/out/graph_nodes.csv", "w")
-    try:
-        f.writelines('Id,Type,\n')
-        for x in nodes:
-            if x[0] not in not_single:
-                continue
-            tmp = ''
-            tmp += x[0]
-            tmp += ','
-            tmp += x[1]['Type']
-            tmp += ',\n'
-            f.writelines(tmp)
-    finally:
-        f.close()
-
-
-def write_edges(G):
-    """ 将伴病网络的边集合写入文件
-    :param G: 伴病网络字典，使用networkx实现
+    :param not_single: 出现过不止一次的点集合
     :return: 无
     """
 
     edges = list(G.edges_iter(data='weight', default=1))
+    nodes_dict = dict(G.nodes_iter(data='Type'))
+    not_single_2 = set()
     f = open("visual_new/out/graph_edges.csv", "w")
     try:
         f.writelines('Source,Target,Weight,\n')
         for x in edges:
+            t1 = nodes_dict[x[0]]['Type']
+            t2 = nodes_dict[x[1]]['Type']
+            if (t1 == 'vice_dis' and t2 == 'sur') or \
+               (t1 == 'sur' and t2 == 'vice_dis'):
+                    continue
+            not_single_2.add(x[0])
+            not_single_2.add(x[1])
             tmp = ''
             tmp += x[0]
             tmp += ','
             tmp += x[1]
             tmp += ','
             tmp += str(x[2])
+            tmp += ',\n'
+            f.writelines(tmp)
+    finally:
+        f.close()
+
+    nodes_list = list(G.nodes_iter(data='Type'))
+    f = open("visual_new/out/graph_nodes.csv", "w")
+    try:
+        f.writelines('Id,Type,\n')
+        for x in nodes_list:
+            if x[0] not in not_single:  # 过滤掉没有邻居的节点
+                continue
+            if x[0] not in not_single_2:  # 再次过滤一次
+                continue
+            tmp = ''
+            tmp += x[0]
+            tmp += ','
+            tmp += x[1]['Type']
             tmp += ',\n'
             f.writelines(tmp)
     finally:
@@ -116,10 +121,12 @@ def get_graph(normal_diseases, normal_surgeries, medical_records):
             if now <= 11:
                 if s in normal_diseases:
                     if now == 1:
-                        G.add_node(s, Type='main_dis')
+                        if s not in G.nodes():
+                            G.add_node(s, Type='main_dis')
                         one_main_dis = s
                     else:
-                        G.add_node(s, Type='vice_dis')
+                        if s not in G.nodes():
+                            G.add_node(s, Type='vice_dis')
                         vice_dis.add(s)
                     total_disease.add(s)
                     if s not in single_times:
@@ -168,5 +175,4 @@ def get_graph(normal_diseases, normal_surgeries, medical_records):
 
 normal_diseases, normal_surgeries, medical_records = init()
 G, not_single = get_graph(normal_diseases, normal_surgeries, medical_records)
-write_nodes(G, not_single)  # 把节点写入文件
-write_edges(G)  # 把边写入文件
+write_G(G, not_single)  # 把图写入文件
