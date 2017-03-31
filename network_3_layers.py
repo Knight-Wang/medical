@@ -37,7 +37,7 @@ def init():
                                        S050501, S051201, S051301, S051401, \
                                        S051501, S057001, S057101, S057201, \
                                        S057301, S057401 \
-                                  from heart_new')
+                                  from heart_new limit 100000')
 
     print '医疗记录为 %d 条' % len(medical_records)
 
