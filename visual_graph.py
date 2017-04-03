@@ -32,19 +32,17 @@ def init():
              医疗记录
     """
     d = DataBase.DataBase()
-    values = d.query('select 疾病名称 from i2025')
-    normal_diseases = set()  # 标准疾病名称集合
-    for t in values:
-        for s in t:
-            normal_diseases.add(s)
+    values = d.query('select ICD, 疾病名称 from i2025')
+    normal_diseases = {}  # 标准疾病名称字典 <key, value> = <标准疾病名称, 疾病编码>
+    for v in values:
+        normal_diseases[v[1]] = v[0]
 
     print '标准疾病名称个数为 %d' % len(normal_diseases)
 
-    values = d.query('select 手术名称 from heart_surgery')
-    normal_surgeries = set()  # 标准手术名称集合
-    for t in values:
-        for s in t:
-            normal_surgeries.add(s)
+    values = d.query('select ICD, 手术名称 from heart_surgery')
+    normal_surgeries = {}  # 标准手术名称字典 <key, value> = <标准手术名称, 手术编码>
+    for v in values:
+        normal_surgeries[v[1]] = v[0]
 
     print '标准手术名称个数为 %d' % len(normal_surgeries)
 
@@ -116,14 +114,15 @@ def get_graph(normal_diseases, normal_surgeries, medical_records):
     :param normal_diseases: 标准疾病名称集合
     :param normal_surgeries: 标准手术名称集合
     :param medical_records: 医疗记录
-    :return:
+    :return: G -> 建好的伴病网络，采用 networkx 实现的有向图
+             not_single -> 至少有一个邻居（非孤立点）的标准疾病名称，标准手术名称集合
     """
 
     total_disease = set()  # 已经识别出来的标准疾病名称集合
     total_surgeries = set()  # 已经识别出来的标准手术名称集合
-    union_times = {}
-    single_times = {}
-    G = nx.DiGraph()
+    union_times = {}   # tuple(a, b)共同出现的次数
+    single_times = {}  # 疾病或手术名称单独出现的次数
+    G = nx.DiGraph()  # 伴病网络
     for t in medical_records:
         link = set()
         now = 0
@@ -131,7 +130,7 @@ def get_graph(normal_diseases, normal_surgeries, medical_records):
             now += 1
             if not s:
                 continue
-            if now <= 11:
+            if now <= 11:  # 这是一个疾病名称
                 if s in normal_diseases:
                     G.add_node(s, Type='dis')
                     link.add(s)
@@ -139,7 +138,7 @@ def get_graph(normal_diseases, normal_surgeries, medical_records):
                     if s not in single_times:
                         single_times[s] = 1
                     single_times[s] += 1
-            else:
+            else:  # 这是一个手术名称
                 if s in normal_surgeries:
                     G.add_node(s, Type='sur')
                     link.add(s)
