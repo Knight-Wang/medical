@@ -4,6 +4,7 @@
 import networkx as nx
 import sys
 import DataBase
+
 reload(sys)
 sys.setdefaultencoding('utf8')
 
@@ -15,19 +16,26 @@ def init():
              医疗记录
     """
     d = DataBase.DataBase()
-    values = d.query('select 疾病名称 from i2025')
-    normal_diseases = set()  # 标准疾病名称集合
-    for t in values:
-        for s in t:
-            normal_diseases.add(s)
+    values = d.query('select ICD, 疾病名称 from i2025')
+
+    normal_diseases = {}  # 标准疾病名称字典 <key, value> = <名称, 编码>
+    for v in values:
+        normal_diseases[v[1]] = v[0]
 
     print '标准疾病名称个数为 %d' % len(normal_diseases)
 
-    values = d.query('select 手术名称 from heart_surgery')
-    normal_surgeries = set()  # 标准手术名称集合
-    for t in values:
-        for s in t:
-            normal_surgeries.add(s)
+    values = d.query('select ICD, 疾病名称 from heart_names_4')
+
+    normal_diseases_4 = {}  # 标准疾病名称亚目字典 <key, value> = <4位编码, 名称>
+    for v in values:
+        normal_diseases_4[v[0]] = v[1]
+
+    print '标准疾病亚目名称个数为 %d' % len(normal_diseases_4)
+
+    values = d.query('select ICD, 手术名称 from heart_surgery')
+    normal_surgeries = {}  # 标准手术名称字典 <key, value> = <名称, 编码>
+    for v in values:
+        normal_surgeries[v[1]] = v[0]
 
     print '标准手术名称个数为 %d' % len(normal_surgeries)
 
@@ -41,7 +49,7 @@ def init():
 
     print '医疗记录为 %d 条' % len(medical_records)
 
-    return normal_diseases, normal_surgeries, medical_records
+    return normal_diseases, normal_diseases_4, normal_surgeries, medical_records
 
 
 def write_G(G, not_single):
@@ -52,19 +60,10 @@ def write_G(G, not_single):
     """
 
     edges = list(G.edges_iter(data='weight', default=1))
-    nodes_dict = dict(G.nodes_iter(data='Type'))
-    not_single_2 = set()
     f = open("visual_new/out/graph_edges.csv", "w")
     try:
         f.writelines('Source,Target,Weight,\n')
         for x in edges:
-            t1 = nodes_dict[x[0]]['Type']
-            t2 = nodes_dict[x[1]]['Type']
-            if (t1 == 'vice_dis' and t2 == 'sur') or \
-               (t1 == 'sur' and t2 == 'vice_dis'):
-                    continue
-            not_single_2.add(x[0])
-            not_single_2.add(x[1])
             tmp = ''
             tmp += x[0]
             tmp += ','
@@ -76,17 +75,17 @@ def write_G(G, not_single):
     finally:
         f.close()
 
-    nodes_list = list(G.nodes_iter(data='Type'))
+    nodes_list = list(G.nodes_iter(data='Label'))
     f = open("visual_new/out/graph_nodes.csv", "w")
     try:
-        f.writelines('Id,Type,\n')
+        f.writelines('Id,Label,Type,\n')
         for x in nodes_list:
             if x[0] not in not_single:  # 过滤掉没有邻居的节点
                 continue
-            if x[0] not in not_single_2:  # 再次过滤一次
-                continue
             tmp = ''
             tmp += x[0]
+            tmp += ','
+            tmp += x[1]['Label']
             tmp += ','
             tmp += x[1]['Type']
             tmp += ',\n'
@@ -95,19 +94,20 @@ def write_G(G, not_single):
         f.close()
 
 
-def get_graph(normal_diseases, normal_surgeries, medical_records):
+def get_graph(normal_diseases, normal_diseases_4, normal_surgeries, medical_records):
     """ 构建伴病网络
     :param normal_diseases: 标准疾病名称集合
     :param normal_surgeries: 标准手术名称集合
     :param medical_records: 医疗记录
-    :return:
+    :return: G -> 构建好的伴病网络，使用 networkx 实现
+             not_single -> 至少有一个邻居的 疾病 或 手术 名称（非孤立点）集合
     """
 
     total_disease = set()  # 已经识别出来的标准疾病名称集合
     total_surgeries = set()  # 已经识别出来的标准手术名称集合
-    union_times = {}
-    single_times = {}
-    G = nx.DiGraph()
+    union_times = {}  # tuple(a, b) 出现的次数
+    single_times = {}  # 疾病或手术名称出现的次数
+    G = nx.DiGraph()  # 伴病网络
 
     for t in medical_records:
         one_main_dis = ''  # 主诊断
@@ -118,28 +118,33 @@ def get_graph(normal_diseases, normal_surgeries, medical_records):
             now += 1
             if not s:
                 continue
-            if now <= 11:
-                if s in normal_diseases:
+            if now <= 11:  # 这个是疾病名称
+                if s in normal_diseases.keys():
+                    name_4 = normal_diseases_4[normal_diseases[s][:5]]  # 找到这个6位名称所对应的4位名称
                     if now == 1:
-                        if s not in G.nodes():
-                            G.add_node(s, Type='main_dis')
-                        one_main_dis = s
+                        dis_ID = name_4 + "_main"  # 相同的疾病名称在不同的记录中可能分别作为主诊断和副诊断，
+                                                   # 这里在后面加上后缀 "_main" 或 "_vice" 来区分
+                        if dis_ID not in G.nodes():
+                            G.add_node(dis_ID, Type='main_dis', Label=normal_diseases[s][:5])
+                        one_main_dis = dis_ID
                     else:
-                        if s not in G.nodes():
-                            G.add_node(s, Type='vice_dis')
-                        vice_dis.add(s)
-                    total_disease.add(s)
-                    if s not in single_times:
-                        single_times[s] = 1
-                    single_times[s] += 1
-            else:
-                if s in normal_surgeries:
-                    G.add_node(s, Type='sur')
-                    surgeries.add(s)
+                        dis_ID = name_4 + "_vice"
+                        if dis_ID not in G.nodes():
+                            G.add_node(dis_ID, Type='vice_dis', Label=normal_diseases[s][:5])
+                        vice_dis.add(dis_ID)
+                    total_disease.add(name_4)
+                    if dis_ID not in single_times:
+                        single_times[dis_ID] = 1
+                    single_times[dis_ID] += 1
+            else:  # 这个是手术名称
+                if s in normal_surgeries.keys():
+                    sur_ID = s + "_sur"
+                    G.add_node(sur_ID, Type='sur', Label=normal_surgeries[s])
+                    surgeries.add(sur_ID)
                     total_surgeries.add(s)
-                    if s not in single_times:
-                        single_times[s] = 1
-                    single_times[s] += 1
+                    if sur_ID not in single_times:
+                        single_times[sur_ID] = 1
+                    single_times[sur_ID] += 1
 
         if not one_main_dis:
             continue
@@ -173,6 +178,6 @@ def get_graph(normal_diseases, normal_surgeries, medical_records):
     return G, not_single
 
 
-normal_diseases, normal_surgeries, medical_records = init()
-G, not_single = get_graph(normal_diseases, normal_surgeries, medical_records)
+normal_diseases, normal_diseases_4, normal_surgeries, medical_records = init()
+G, not_single = get_graph(normal_diseases, normal_diseases_4, normal_surgeries, medical_records)
 write_G(G, not_single)  # 把图写入文件
