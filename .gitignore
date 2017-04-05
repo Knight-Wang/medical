@@ -5,6 +5,7 @@
 /texts/out/
 /Experiment_LabeledData/
 /neighbour_test_texts/
+/main_new_texts/
 # csv
 *.csv
 

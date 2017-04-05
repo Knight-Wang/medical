@@ -221,7 +221,7 @@ def filter_interested_names(G, interested_names):
     try:
         for i in interested_names:
             name = i + "_main"
-            f.writelines(name + " " + str(len(neighbors[name])) + "\n")
+            f.writelines(name + " | " + str(len(neighbors[name])) + "\n")
             for x in neighbors[name]:
                 f.writelines(x + "\n")
             f.writelines("\n")
@@ -231,38 +231,68 @@ def filter_interested_names(G, interested_names):
 
 
 def write_bad_names(bad_names):
-    f = open("main_new_texts/out/bad_names_dic.txt.txt", "w")
+    f = open("main_new_texts/out/bad_names_dic.txt", "w")
     try:
         f.writelines(str(len(bad_names)) + "\n")
         for x in bad_names.keys():
-            f.writelines(x + " " + str(len(bad_names[x])) + "\n")
+            f.writelines(x + " | " + str(len(bad_names[x])) + "\n")
             for y in bad_names[x]:
                 f.writelines(y + "\n")
             f.writelines("\n")
     finally:
         f.close()
 
-# 获得消歧所需要的数据，并持久化保存在文件中
-# normal_diseases, normal_surgeries, medical_records = init()
-# G, not_single, bad_names = get_graph(normal_diseases, normal_surgeries, medical_records)
-# write_bad_names(bad_names)
-# interested_names = load_interested_names()
-# neighbors = filter_interested_names(G, interested_names)
 
+def read_file(file_name):
+    res = {}
+    f = open(file_name, "r")
+    num = int(f.readline().strip())
+    while num:
+        line = f.readline().strip()
+        line = line.split('|')
+        name = line[0].strip()
+        res[name] = set()
+        n = int(line[1].strip())
+        while n:
+            res[name].add(f.readline().strip())
+            n -= 1
+        f.readline()
+        num -= 1
+    return res
+
+
+def read_data():
+    neighbors = read_file("main_new_texts/out/neighbors.txt")
+    bad_names = read_file("main_new_texts/out/bad_names_dic.txt")
+    return neighbors, bad_names
+
+
+# 获得消歧所需要的数据，并持久化保存在文件中
+normal_diseases, normal_surgeries, medical_records = init()
+G, not_single, bad_names = get_graph(normal_diseases, normal_surgeries, medical_records)
+write_bad_names(bad_names)
+interested_names = load_interested_names()
+nghbors = filter_interested_names(G, interested_names)
+
+'''
 d = DataBase.DataBase()
 values = d.query('select ICD, 疾病名称 from I2025')
 normal = getNormalNames(values)  # (normalized_name, ICD-10)
 icd4_dic = getICDTree(normal)
 
+neighbors, bad_names = read_data()
+
 values = d.query('select ICD, 非标准名称, 标准疾病名 from LabeledData where 标准疾病名 like \'急性ST段抬高型%\'')
 
 print '测试集总记录数为 %d' % (len(values))
 
+
 preprocess_ok = open("main_new_texts/out/res/preprocess_ok.txt", "w")
 need_further_process = open("main_new_texts/out/res/need_further_process.txt", "w")
-
+not_in_dic = open("main_new_texts/out/res/not_in_dic.txt", "w")
 cnt = 0
 cnt_ok = 0
+cnt_not_in_dic = 0
 
 for row in values:
     unnormalized_name = row[1].strip()
@@ -285,6 +315,10 @@ for row in values:
             else:
                 need_further_process.writelines(unnormalized_name + "\n")
                 # 在这里进行消歧
+                if unnormalized_name not in bad_names.keys():
+                    cnt_not_in_dic += 1
+                    not_in_dic.writelines(unnormalized_name + "\n")
+
         else:  # map to a disease name but the name is not the labeled one.
             pass
     else:  # cannot map
@@ -292,6 +326,9 @@ for row in values:
 
 print '有效记录数为 %d 条' % cnt
 print '相似度很高，无需消歧的记录有 %d 条' % cnt_ok
+print '不在非标准名称字典中，无法消歧的有 %d 条' % cnt_not_in_dic
 
 preprocess_ok.close()
 need_further_process.close()
+not_in_dic.close()
+'''
