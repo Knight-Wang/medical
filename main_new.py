@@ -5,6 +5,7 @@ import networkx as nx
 import sys
 import DataBase
 import copy
+import math
 from Preprocess import process, getMappingResult, getNormalNames, addBrotherNodes, getICDTree
 
 reload(sys)
@@ -113,6 +114,16 @@ def write_G(G, not_single):
             f.writelines(tmp)
     finally:
         f.close()
+
+
+def write_graph(G):
+    f = open("main_new_texts/out/res/graph.txt", "w")
+    f.writelines(str(G.number_of_nodes()) + "\n")
+    for x in G.nodes():
+        f.writelines(x + " | " + str(len(G.neighbors(x))) + "\n")
+        for y in G.neighbors(x):
+            f.writelines(y + "\n")
+        f.writelines("\n")
 
 
 def get_graph(normal_diseases, normal_surgeries, medical_records):
@@ -312,15 +323,129 @@ def write_neigh(u_name, n_name, bad_names, bad_names_vice, f):
         f.writelines('\n')
 
 
+def get_cand(unnormalized_name, normal, icd4_dic):
+    p_name = process(unnormalized_name)
+    name_dict, match_type = getMappingResult(p_name, normal)
+    # 不加父节点
+    if match_type == 4:
+        name_dict = addBrotherNodes(p_name, name_dict, icd4_dic, normal)
+    return name_dict
+
+
+def cal(neigh, can_neigh):
+    """ 计算两个集合之间的相似度
+    :param neigh: 非标准疾病名称的伴病集合
+    :param can_neigh: 候选标准疾病名称的邻居集合
+    :return: 两个集合之间的相似度
+    """
+    union = set()
+    for x in neigh:
+        union.add(x)
+    for x in can_neigh:
+        union.add(x)
+
+    vec1 = []
+    vec2 = []
+    for ele in union:
+        if ele in neigh:
+            vec1.append(1.0)
+        else:
+            vec1.append(0.0)
+        if ele in can_neigh:
+            vec2.append(1.0)
+        else:
+            vec2.append(0.0)
+
+    n = len(vec1)
+    m1 = 0.0
+    m2 = 0.0
+    product = 0.0
+    for i in range(n):
+        product += vec1[i] * vec2[i]
+        m1 += vec1[i] * vec1[i]
+        m2 += vec2[i] * vec2[i]
+
+    return product * 1.0 / (math.sqrt(m1) * math.sqrt(m2))
+
+
+def dic2list(dic):
+    """ 将字典dic按照value（相似度）排序（降序）后放入列表中返回
+    :param dic: 字典 <key, value> = <标准疾病名称, 相似度>
+    :return: [(标准疾病名称1, 相似度1), [(标准疾病名称2, 相似度2), ...](降序)
+    """
+    l = [(k, v) for (k, v) in dic.iteritems()]
+    l = sorted(l, cmp=lambda x, y: cmp(x[1], y[1]), reverse=True)
+    return l
+
+
 # 获得消歧所需要的数据，并持久化保存在文件中
 # normal_diseases, normal_surgeries, medical_records = init()
 # G, not_single, bad_names, bad_names_vice = get_graph(normal_diseases, normal_surgeries, medical_records)
+# write_graph(G)
 # write_bad_names(bad_names, "main_new_texts/out/bad_names_dic.txt")
 # write_bad_names(bad_names_vice, "main_new_texts/out/bad_names_vice_dic.txt")
 # interested_names = load_interested_names()
 # neighbors = filter_interested_names(G, interested_names)
 
+d = DataBase.DataBase()
+values = d.query('select ICD, 疾病名称 from I2025')
+normal = getNormalNames(values)  # (normalized_name, ICD-10)
+icd4_dic = getICDTree(normal)
 
+G = read_file("main_new_texts/out/res/graph.txt")
+
+f = open("main_new_texts/out/res/need_fur_pro_high.txt", "r")
+result = open("main_new_texts/out/res/neigh_sim.txt", "w")
+
+num = 17
+cnt = 18
+while num:
+    line = f.readline().strip().split()
+    u_name = line[0]
+    n_name = line[1]
+    neigh = set()
+    line = f.readline().strip().split('|')
+    n = int(line[1].strip())
+    while n:
+        nei = f.readline().strip()
+        neigh.add(nei)
+        n -= 1
+    f.readline()
+    line = f.readline().strip().split('|')
+    n = int(line[1].strip())
+    while n:
+        f.readline()
+        n -= 1
+    f.readline()
+
+    can_dic = get_cand(u_name.decode("utf-8"), normal, icd4_dic)
+
+    res = {}
+    for k, v in can_dic.iteritems():
+        k = k + "_main"
+        can_neigh = G[k.encode("utf-8")]
+        # 计算 neigh 和 can_neigh 之间的相似度
+        sim = cal(neigh, can_neigh)
+        res[k] = sim
+
+    can_list = dic2list(can_dic)
+    res_list = dic2list(res)
+    result.writelines(str(cnt - num) + " " + u_name + "\n")
+    result.writelines("==============================\n")
+    for x in can_list:
+        result.writelines(x[0] + " " + str(x[1]) + "\n")
+    result.writelines("------------------------------\n")
+    for x in res_list:
+        result.writelines(x[0] + " " + str(x[1]) + "\n")
+    result.writelines("++++++++++++++++++++++++++++++\n")
+    result.writelines("\n")
+
+    num -= 1
+
+f.close()
+result.close()
+
+'''
 d = DataBase.DataBase()
 values = d.query('select ICD, 疾病名称 from I2025')
 normal = getNormalNames(values)  # (normalized_name, ICD-10)
@@ -401,3 +526,4 @@ preprocess_ok.close()
 not_in_dic.close()
 need_fur_pro_low.close()
 need_fur_pro_high.close()
+'''
