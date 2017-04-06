@@ -51,7 +51,7 @@ unmap_id = 0
 candidate_num = [0,0,0,0,0,0]
 match_type_distr = [0,0,0,0]
 
-topK = 5
+topK = 1
 cnt_sim_k = 0
 
 file = open(dir + "/disambiguate_res.txt", "w")
@@ -113,7 +113,7 @@ for row in values:
                 candidate_top_k = [sort_name_list[i][0] for i in range(len_candidates)]
 
             if normalized_name in candidate_top_k:
-                    cnt_sim_k += 1
+                cnt_sim_k += 1
             else:
                 str_pair = [k + ":" + str(v) for (k, v) in sort_name_list]
                 writeFile(file, " ".join(p_name), ",".join(str_pair), normalized_name, normalized_id)
