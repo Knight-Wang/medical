@@ -50,17 +50,27 @@ def init():
 
     print '标准手术名称个数为 %d' % len(normal_surgeries)
 
-    medical_records = d.query('select  S050100, S050200, S050600, S050700, \
-                                       S050800, S050900, S051000, S051100, \
-                                       S056000, S056100, S056200, \
-                                       S050501, S051201, S051301, S051401, \
-                                       S051501, S057001, S057101, S057201, \
-                                       S057301, S057401 \
-                                  from heart_new')
+    medical_records_2013 = d.query('select  S050100, S050200, S050600, S050700, \
+                                            S050800, S050900, S051000, S051100, \
+                                            S056000, S056100, S056200, \
+                                            S050501, S051201, S051301, S051401, \
+                                            S051501, S057001, S057101, S057201, \
+                                            S057301, S057401 \
+                                       from heart_new_2013')
 
-    print '医疗记录为 %d 条' % len(medical_records)
+    medical_records_2014_15 = d.query('select  S050100, S050200, S050600, S050700, \
+                                               S050800, S050900, S051000, S051100, \
+                                               S056000, S056100, S056200, \
+                                               S050501, S051201, S051301, S051401, \
+                                               S051501, S057001, S057101, S057201, \
+                                               S057301, S057401 \
+                                          from heart_new')
 
-    return normal_diseases, normal_surgeries, medical_records
+    medical_records_2013[len(medical_records_2013):len(medical_records_2013)] = medical_records_2014_15
+
+    print '医疗记录为 %d 条' % len(medical_records_2013)
+
+    return normal_diseases, normal_surgeries, medical_records_2013
 
 
 def write_G(G, not_single):
@@ -119,17 +129,23 @@ def get_graph(normal_diseases, normal_surgeries, medical_records):
     union_times = {}  # tuple(a, b) 出现的次数
     single_times = {}  # 疾病或手术名称出现的次数
     G = nx.DiGraph()  # 伴病网络
-    bad_names = {}  # 存储非标准疾病名称和它的标准疾病名称邻居们
+    bad_names = {}  # 存储非标准疾病主诊断名称和它的标准疾病名称邻居们
+    bad_names_vice = {}  # 存储非标准疾病副诊断名称和它的标准疾病名称邻居们
 
     for t in medical_records:
         one_main_dis = ''  # 主诊断
         vice_dis = set()  # 副诊断集合
         surgeries = set()  # 手术集合
         is_normal = True  # 这条记录中的主诊断是否是标准疾病名称
+        bad_vice = set()  # 这条记录中的非标准副诊断疾病名称
         now = 0
         for s in t:
+            s = s.strip()
+            s = ' '.join(s.split())
             now += 1
             if not s:
+                continue
+            if s == 'NA':
                 continue
             if now <= 11:  # 这个是疾病名称
                 if s in normal_diseases.keys():
@@ -149,9 +165,11 @@ def get_graph(normal_diseases, normal_surgeries, medical_records):
                         single_times[dis_ID] = 1
                     single_times[dis_ID] += 1
                 else:  # 这是个非标准的疾病名称
-                    if now == 1:  # 只把非标准疾病名称中的主诊断记录下来
+                    if now == 1:  # 非标准疾病名称中的主诊断
                         is_normal = False
                         one_main_dis = s
+                    else:  # 非标准疾病名称中的副诊断
+                        bad_vice.add(s)
             else:  # 这个是手术名称
                 if s in normal_surgeries.keys():
                     sur_ID = s + "_surg"
@@ -161,6 +179,17 @@ def get_graph(normal_diseases, normal_surgeries, medical_records):
                     if sur_ID not in single_times:
                         single_times[sur_ID] = 1
                     single_times[sur_ID] += 1
+
+        for b in bad_vice:  # 记录非标准副诊断名称和它的标准疾病名称邻居
+            if (one_main_dis and is_normal) or vice_dis or surgeries:  # 没有标准疾病名称邻居就不添加
+                if b not in bad_names_vice:
+                    bad_names_vice[b] = set()
+                if one_main_dis and is_normal:
+                    bad_names_vice[b].add(one_main_dis)
+                for v in vice_dis:
+                    bad_names_vice[b].add(v)
+                for s in surgeries:
+                    bad_names_vice[b].add(s)
 
         if not one_main_dis:
             continue
@@ -203,7 +232,7 @@ def get_graph(normal_diseases, normal_surgeries, medical_records):
         not_single.add(k[0])
         not_single.add(k[1])
 
-    return G, not_single, bad_names
+    return G, not_single, bad_names, bad_names_vice
 
 
 def filter_interested_names(G, interested_names):
@@ -218,6 +247,7 @@ def filter_interested_names(G, interested_names):
         neighbors[name] = copy.copy(G.neighbors(name))
 
     f = open("main_new_texts/out/neighbors.txt", "w")
+    f.writelines(str(len(neighbors)) + "\n")
     try:
         for i in interested_names:
             name = i + "_main"
@@ -230,8 +260,8 @@ def filter_interested_names(G, interested_names):
     return neighbors
 
 
-def write_bad_names(bad_names):
-    f = open("main_new_texts/out/bad_names_dic.txt", "w")
+def write_bad_names(bad_names, file_name):
+    f = open(file_name, "w")
     try:
         f.writelines(str(len(bad_names)) + "\n")
         for x in bad_names.keys():
@@ -264,35 +294,54 @@ def read_file(file_name):
 def read_data():
     neighbors = read_file("main_new_texts/out/neighbors.txt")
     bad_names = read_file("main_new_texts/out/bad_names_dic.txt")
-    return neighbors, bad_names
+    bad_names_vice = read_file("main_new_texts/out/bad_names_vice_dic.txt")
+    return neighbors, bad_names, bad_names_vice
+
+
+def write_neigh(u_name, bad_names, bad_names_vice, f):
+    f.writelines(u_name + "\n")
+    if u_name in bad_names.keys():
+        f.writelines("作为主诊断出现时邻居有 | " + str(len(bad_names[u_name])) + '\n')
+        for x in bad_names[u_name]:
+            f.writelines(x + '\n')
+        f.writelines('\n')
+    if u_name in bad_names_vice.keys():
+        f.writelines("作为副诊断出现时邻居有 | " + str(len(bad_names_vice[u_name])) + '\n')
+        for x in bad_names_vice[u_name]:
+            f.writelines(x + '\n')
+        f.writelines('\n')
 
 
 # 获得消歧所需要的数据，并持久化保存在文件中
-normal_diseases, normal_surgeries, medical_records = init()
-G, not_single, bad_names = get_graph(normal_diseases, normal_surgeries, medical_records)
-write_bad_names(bad_names)
-interested_names = load_interested_names()
-nghbors = filter_interested_names(G, interested_names)
+# normal_diseases, normal_surgeries, medical_records = init()
+# G, not_single, bad_names, bad_names_vice = get_graph(normal_diseases, normal_surgeries, medical_records)
+# write_bad_names(bad_names, "main_new_texts/out/bad_names_dic.txt")
+# write_bad_names(bad_names_vice, "main_new_texts/out/bad_names_vice_dic.txt")
+# interested_names = load_interested_names()
+# neighbors = filter_interested_names(G, interested_names)
 
-'''
+
 d = DataBase.DataBase()
 values = d.query('select ICD, 疾病名称 from I2025')
 normal = getNormalNames(values)  # (normalized_name, ICD-10)
 icd4_dic = getICDTree(normal)
 
-neighbors, bad_names = read_data()
+neighbors, bad_names, bad_names_vice = read_data()
 
-values = d.query('select ICD, 非标准名称, 标准疾病名 from LabeledData where 标准疾病名 like \'急性ST段抬高型%\'')
+values = d.query('select ICD, 非标准名称, 标准疾病名 from LabeledData')
 
 print '测试集总记录数为 %d' % (len(values))
 
-
 preprocess_ok = open("main_new_texts/out/res/preprocess_ok.txt", "w")
-need_further_process = open("main_new_texts/out/res/need_further_process.txt", "w")
 not_in_dic = open("main_new_texts/out/res/not_in_dic.txt", "w")
+need_fur_pro_low = open("main_new_texts/out/res/need_fur_pro_low.txt", "w")
+need_fur_pro_high = open("main_new_texts/out/res/need_fur_pro_high.txt", "w")
 cnt = 0
 cnt_ok = 0
 cnt_not_in_dic = 0
+cnt_need_fur_pro = 0
+cnt_neigh_low = 0
+cnt_neigh_high = 0
 
 for row in values:
     unnormalized_name = row[1].strip()
@@ -309,15 +358,32 @@ for row in values:
         str_pair = [k + ":" + str(v) for (k, v) in sort_name_list]
         if normalized_name in name_dict.keys():  # map correctly
             cnt += 1
-            if sort_name_list[0][1] > 0.857:
+            if sort_name_list[0][1] >= 0.85:
                 cnt_ok += 1
                 preprocess_ok.writelines(unnormalized_name + " | " + sort_name_list[0][0] + " | " + normalized_name + "\n")
             else:
-                need_further_process.writelines(unnormalized_name + "\n")
+                normalized_name = normalized_name.encode("utf-8")
+                unnormalized_name = unnormalized_name.encode("utf-8")
                 # 在这里进行消歧
-                if unnormalized_name not in bad_names.keys():
+                if (unnormalized_name not in bad_names.keys()) and (unnormalized_name not in bad_names_vice.keys()):
                     cnt_not_in_dic += 1
                     not_in_dic.writelines(unnormalized_name + "\n")
+                else:
+                    cnt_need_fur_pro += 1
+
+                    cnt_neigh = 0  # 记录邻居个数，将邻居个数太少的分开
+
+                    if unnormalized_name in bad_names.keys():
+                        cnt_neigh += len(bad_names[unnormalized_name])
+                    if unnormalized_name in bad_names_vice.keys():
+                        cnt_neigh += len(bad_names_vice[unnormalized_name])
+
+                    if cnt_neigh > 3:
+                        cnt_neigh_high += 1
+                        write_neigh(unnormalized_name, bad_names, bad_names_vice, need_fur_pro_high)
+                    else:
+                        cnt_neigh_low += 1
+                        write_neigh(unnormalized_name, bad_names, bad_names_vice, need_fur_pro_low)
 
         else:  # map to a disease name but the name is not the labeled one.
             pass
@@ -327,8 +393,11 @@ for row in values:
 print '有效记录数为 %d 条' % cnt
 print '相似度很高，无需消歧的记录有 %d 条' % cnt_ok
 print '不在非标准名称字典中，无法消歧的有 %d 条' % cnt_not_in_dic
+print '可以进行消歧的有 %d 条' % cnt_need_fur_pro
+print '邻居数量过少的记录有 %d 条' % cnt_neigh_low
+print '邻居数量较多的记录有 %d 条' % cnt_neigh_high
 
 preprocess_ok.close()
-need_further_process.close()
 not_in_dic.close()
-'''
+need_fur_pro_low.close()
+need_fur_pro_high.close()
