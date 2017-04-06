@@ -298,8 +298,8 @@ def read_data():
     return neighbors, bad_names, bad_names_vice
 
 
-def write_neigh(u_name, bad_names, bad_names_vice, f):
-    f.writelines(u_name + "\n")
+def write_neigh(u_name, n_name, bad_names, bad_names_vice, f):
+    f.writelines(u_name + " " + n_name + "\n")
     if u_name in bad_names.keys():
         f.writelines("作为主诊断出现时邻居有 | " + str(len(bad_names[u_name])) + '\n')
         for x in bad_names[u_name]:
@@ -380,10 +380,10 @@ for row in values:
 
                     if cnt_neigh > 3:
                         cnt_neigh_high += 1
-                        write_neigh(unnormalized_name, bad_names, bad_names_vice, need_fur_pro_high)
+                        write_neigh(unnormalized_name, normalized_name, bad_names, bad_names_vice, need_fur_pro_high)
                     else:
                         cnt_neigh_low += 1
-                        write_neigh(unnormalized_name, bad_names, bad_names_vice, need_fur_pro_low)
+                        write_neigh(unnormalized_name, normalized_name, bad_names, bad_names_vice, need_fur_pro_low)
 
         else:  # map to a disease name but the name is not the labeled one.
             pass
