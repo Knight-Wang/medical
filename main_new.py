@@ -332,12 +332,31 @@ def get_cand(unnormalized_name, normal, icd4_dic):
     return name_dict
 
 
-def cal(neigh, can_neigh):
+def cosine(vec1, vec2):
+    n = len(vec1)
+    m1 = 0.0
+    m2 = 0.0
+    product = 0.0
+    for i in range(n):
+        product += vec1[i] * vec2[i]
+        m1 += vec1[i] * vec1[i]
+        m2 += vec2[i] * vec2[i]
+
+    if m1 < 1e-5 or m2 < 1e-5:  # 0向量
+        return 0.0
+
+    return product * 1.0 / (math.sqrt(m1) * math.sqrt(m2))
+
+
+def cal(neigh, can_name, G, can_dic):
     """ 计算两个集合之间的相似度
     :param neigh: 非标准疾病名称的伴病集合
-    :param can_neigh: 候选标准疾病名称的邻居集合
+    :param can_name: 候选标准疾病名称
+    :param G: 伴病网络
+    :param can_dic: 候选字典
     :return: 两个集合之间的相似度
     """
+    can_neigh = G[can_name.encode("utf-8")]
     union = set()
     for x in neigh:
         union.add(x)
@@ -348,24 +367,32 @@ def cal(neigh, can_neigh):
     vec2 = []
     for ele in union:
         if ele in neigh:
-            vec1.append(1.0)
+            cnt = 1
+            tmp_e = ele.encode("utf-8")
+
+            for k, v in can_dic.iteritems():
+                k = k + "_main"
+
+                if tmp_e in G[k.encode("utf-8")]:
+                    cnt += 1
+            tmp = math.log((len(can_dic) + 1) * 1.0 / cnt)
+            vec1.append(tmp)
         else:
             vec1.append(0.0)
         if ele in can_neigh:
-            vec2.append(1.0)
+            cnt = 1
+            tmp_e = ele.encode("utf-8")
+            for k, v in can_dic.iteritems():
+                k = k + "_main"
+                if tmp_e in G[k.encode("utf-8")]:
+                    cnt += 1
+            tmp = math.log((len(can_dic) + 1) * 1.0 / cnt)
+            # print tmp
+            vec2.append(tmp)
         else:
             vec2.append(0.0)
 
-    n = len(vec1)
-    m1 = 0.0
-    m2 = 0.0
-    product = 0.0
-    for i in range(n):
-        product += vec1[i] * vec2[i]
-        m1 += vec1[i] * vec1[i]
-        m2 += vec2[i] * vec2[i]
-
-    return product * 1.0 / (math.sqrt(m1) * math.sqrt(m2))
+    return cosine(vec1, vec2)
 
 
 def dic2list(dic):
@@ -397,7 +424,7 @@ G = read_file("main_new_texts/out/res/graph.txt")
 f = open("main_new_texts/out/res/need_fur_pro_high.txt", "r")
 result = open("main_new_texts/out/res/neigh_sim.txt", "w")
 
-num = 17
+num = 17  # 待消歧疾病名称个数
 cnt = 18
 while num:
     line = f.readline().strip().split()
@@ -423,9 +450,8 @@ while num:
     res = {}
     for k, v in can_dic.iteritems():
         k = k + "_main"
-        can_neigh = G[k.encode("utf-8")]
         # 计算 neigh 和 can_neigh 之间的相似度
-        sim = cal(neigh, can_neigh)
+        sim = cal(neigh, k, G, can_dic)
         res[k] = sim
 
     can_list = dic2list(can_dic)
@@ -445,6 +471,7 @@ while num:
 f.close()
 result.close()
 
+# 以下为获得伴病网络等相关代码
 '''
 d = DataBase.DataBase()
 values = d.query('select ICD, 疾病名称 from I2025')
