@@ -1,10 +1,10 @@
 # python
-visual_graph.py
 
 # txt
 /texts/in/
 /texts/out/
 /Experiment_LabeledData/
+/neighbour_test_texts/
 # csv
 *.csv
 
