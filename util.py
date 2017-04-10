@@ -4,6 +4,17 @@ import sys
 reload(sys)
 sys.setdefaultencoding('utf8')
 
+def getICD3Tree(normal):
+    icd3_dict = {}
+
+    for name, icd6 in normal.iteritems():
+        icd3 = icd6[:3]
+        if icd3 not in icd3_dict.keys():
+            icd3_dict[icd3] = [(name, icd6)]
+        else:
+            icd3_dict[icd3].append((name, icd6))
+    return icd3_dict
+
 # 载入ICD层次结构，返回的字典，键是icd4位码，值是list，list中每元素为(ICD6_name, icd6)
 def getICDTree(normal):
     icd4_dict = {}

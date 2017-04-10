@@ -5,7 +5,8 @@ import sys
 import re
 import MySQLdb
 from Preprocess import *
-from preprocess_segs import getICD3Tree
+from util import getICD3Tree, getNormalNames
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 # 用TF-iDF生成标准疾病字典中的关键词，存入文件中
 class ICD_Keywords:

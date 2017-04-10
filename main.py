@@ -7,6 +7,7 @@ import DataBase as db
 from Preprocess import *
 import copy
 import math
+from util import getNormalNames, getICDTree
 
 reload(sys)
 sys.setdefaultencoding('utf8')
