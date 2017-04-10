@@ -2,17 +2,16 @@
 # -*- coding: utf-8 -*-
 
 from Preprocess import *
-import MySQLdb
-from copy import  copy
-import datetime, os
 from top1_disambiguation import *
+import MySQLdb
+from copy import copy
+import datetime, os
 from util import *
 
 reload(sys)
 sys.setdefaultencoding('utf8')
 
 conn = MySQLdb.connect("localhost", "root", "10081008", "medical", charset='utf8')
-
 cursor = conn.cursor()
 
 cursor.execute('select ICD,疾病名称 from I2025')
@@ -28,13 +27,15 @@ for row in values:
 
 starttime = datetime.datetime.now()
 
+cursor.execute('select ICD, 非标准名称, 标准疾病名 from LabeledData limit 10000;')
+priorProb = getPriorProb(cursor.fetchall()) # 得到疾病的先验概率
 cursor.execute('select ICD, 非标准名称, 标准疾病名 from LabeledData limit 10000;') #index, unormalized_name
-# cursor.execute('select ICD, 非标准名称, 标准疾病名 from LabeledData where ICD=\'I20.000108\';') #index, unormalized_name
+# cursor.execute('select ICD, 非标准名称, 标准疾病名 from LabeledData where ICD=\'I21.902001 \';') #debug
 
 values = cursor.fetchall()
 
 enable_write_candidates = True #是否将消歧结果写入文件
-dir = "Experiment_LabeledData"
+dir = "Experiment_LabeledData_Seg"
 if os.path.exists(dir) == False:
     os.mkdir(dir)
 
@@ -58,8 +59,7 @@ cnt_sim_k = 0
 file = open(dir + "/disambiguate_res.txt", "w")
 alias_dict = loadDict("./Dict/Alias.txt")
 
-# icd6_keywords = loadICD6Features(normal)
-icd6_keywords = {}
+file_top = open( dir + "/top_seg.txt", "w+")
 
 for row in values:
         normalized_id = row[0].strip()
@@ -67,13 +67,21 @@ for row in values:
         normalized_name = row[2].strip()
         p_name = process(unnormalized_name)
 
-        name_dict, match_type = getMappingResult(p_name, normal, icd6_keywords) # generate candidates
+        name_dict_seg = getMappingResult_segs(p_name, normal)  # generate candidates
+        top_candidate = getTopCandidate(name_dict_seg)
 
-        match_type_distr[match_type - 1] += 1
-
-        # Add Brother Node
-        if match_type == 4:
-            name_dict = addBrotherNodes(p_name, name_dict, icd4_dic, normal, icd6_keywords)
+        name_dict = {}
+        for d in name_dict_seg:
+            for (k, v) in d.items():
+                if k in name_dict.keys():
+                    name_dict[k] = max(name_dict[k], v)
+                else:
+                    name_dict.update(d)
+        # match_type_distr[match_type - 1] += 1
+        #
+        # # Add Brother Node
+        # if match_type == 4:
+        #     name_dict = addBrotherNodes(p_name, name_dict, icd4_dic, normal, icd6_keywords)
 
         # Add Alias
         dict_copy = copy(name_dict)
@@ -83,9 +91,9 @@ for row in values:
 
         # name_dict is the candidate set(name : sim)
         len_candidates = len(name_dict)
-        candidate_num[len_candidates / 5] += 1
+        # candidate_num[len_candidates / 5] += 1
 
-        sort_name_list = sorted(name_dict.items(), key=lambda d: d[1], reverse=True)
+        sort_name_list = sorted(name_dict.items(), key=lambda d: d[1], reverse=True)[:10]
 
         if enable_write_candidates:
             if len_candidates != 0:
@@ -101,32 +109,14 @@ for row in values:
             else: # cannot map
                 write_List(wrong_file, [" ".join(p_name), "---", normalized_name, normalized_id])
 
-        # test the result of the basic disambiguation
-        if len_candidates != 0:
-
-            candidate_top_k = []
-
-            # topK
-            if len_candidates >= topK:
-                if topK != 1:
-                    candidate_top_k = [sort_name_list[i][0] for i in range(topK)]
-                else:
-                    # top 1
-                    tie_tops = getTieTops(sort_name_list) # top1 相似度并列的候选实体集
-                    if(len(tie_tops) > 1):
-                        tie_tops = optimizeTopCandidates(tie_tops, icd3_names, normal)
-                    candidate_top_k.append(tie_tops[0][0])
-
-                    if tie_tops[0][0] in alias_dict.keys(): # 别名情况下，两个疾病的相似度相同
-                            candidate_top_k.append(alias_dict[tie_tops[0][0]])
-            else:
-                candidate_top_k = [sort_name_list[i][0] for i in range(len_candidates)]
-
-            if normalized_name in candidate_top_k:
-                    cnt_sim_k += 1
-            else:
-                str_pair = [k + ":" + str(v) for (k, v) in sort_name_list]
-                write_List(file, [" ".join(p_name), ",".join(str_pair), normalized_name, normalized_id])
+        candidate_top_k = basicDisambiguation_top1(top_candidate, priorProb, icd3_names, normal)
+        if normalized_name == candidate_top_k or \
+                (candidate_top_k in alias_dict.keys() and normalized_name == alias_dict[candidate_top_k]):
+            # 标准疾病名称 = top1 或者top1的alias就认为正确
+            cnt_sim_k += 1
+        else:
+            str_pair = [k + ":" + str(v) for (k, v) in sort_name_list]
+            file.write("|".join([ " ".join(p_name),candidate_top_k, "".join(str_pair), normalized_name, normalized_id ]))
 
 print("Experiment: Test the basic disambiguation(top %d in the candidate includes the normalized disease name)" % topK)
 print(cnt_sim_k)
