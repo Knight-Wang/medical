@@ -6,7 +6,7 @@ from util import getNormalNames, loadDict
 import copy
 import MySQLdb
 
-class candidate_sim_generator:
+class candidate_sim_generator():
 
     def __init__(self):
         conn = MySQLdb.connect("localhost", "root", "10081008", "medical", charset='utf8')
@@ -18,7 +18,8 @@ class candidate_sim_generator:
         self.alias_dict = loadDict("./Dict/Alias.txt")
 
     # 返回候选实体集合
-    # is_single_segment = 1 说明诊断只有一个片段，
+    # is_single_segment = 1 说明诊断只有一个片段
+    # is_single_segment = 0 说明诊断有多个片段
     def getCandidates(self, names_segs):
 
         name_dict_seg = getMappingResult_segs(names_segs, self.normal)
