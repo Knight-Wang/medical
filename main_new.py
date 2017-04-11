@@ -356,6 +356,7 @@ def cal(neigh, can_name, G, can_dic):
     :param can_dic: 候选字典
     :return: 两个集合之间的相似度
     """
+    res = {}  # 伴病的区分度字典
     can_neigh = G[can_name.encode("utf-8")]
     union = set()
     for x in neigh:
@@ -376,6 +377,7 @@ def cal(neigh, can_name, G, can_dic):
                 if tmp_e in G[k.encode("utf-8")]:
                     cnt += 1
             tmp = math.log((len(can_dic) + 1) * 1.0 / cnt)
+            res[tmp_e] = tmp
             vec1.append(tmp)
         else:
             vec1.append(0.0)
@@ -387,12 +389,13 @@ def cal(neigh, can_name, G, can_dic):
                 if tmp_e in G[k.encode("utf-8")]:
                     cnt += 1
             tmp = math.log((len(can_dic) + 1) * 1.0 / cnt)
+            res[tmp_e] = tmp
             # print tmp
             vec2.append(tmp)
         else:
             vec2.append(0.0)
 
-    return cosine(vec1, vec2)
+    return cosine(vec1, vec2), res
 
 
 def dic2list(dic):
@@ -413,6 +416,7 @@ def dic2list(dic):
 # write_bad_names(bad_names_vice, "main_new_texts/out/bad_names_vice_dic.txt")
 # interested_names = load_interested_names()
 # neighbors = filter_interested_names(G, interested_names)
+
 
 d = DataBase.DataBase()
 values = d.query('select ICD, 疾病名称 from I2025')
@@ -448,21 +452,34 @@ while num:
     can_dic = get_cand(u_name.decode("utf-8"), normal, icd4_dic)
 
     res = {}
+    quality = {}
     for k, v in can_dic.iteritems():
         k = k + "_main"
         # 计算 neigh 和 can_neigh 之间的相似度
-        sim = cal(neigh, k, G, can_dic)
+        sim, qua = cal(neigh, k, G, can_dic)
         res[k] = sim
+        quality[k] = qua
 
     can_list = dic2list(can_dic)
     res_list = dic2list(res)
-    result.writelines(str(cnt - num) + " " + u_name + "\n")
+    result.writelines(str(cnt - num) + " " + u_name + " --> " + n_name + "\n")
+    result.writelines("伴病：\n")
+    for x in neigh:
+        result.writelines(x + "\n")
     result.writelines("==============================\n")
     for x in can_list:
         result.writelines(x[0] + " " + str(x[1]) + "\n")
     result.writelines("------------------------------\n")
+    can_num = 1
     for x in res_list:
+        result.writelines("候选" + str(can_num) + ": \n")
+        can_num += 1
         result.writelines(x[0] + " " + str(x[1]) + "\n")
+        result.writelines("****************************\n")
+        result.writelines("伴病： \n")
+        for y in G[x[0].encode("utf-8")]:
+            result.writelines(y + " : " + str(quality[x[0].decode("utf-8")][y]) + "\n")
+        result.writelines("****************************\n")
     result.writelines("++++++++++++++++++++++++++++++\n")
     result.writelines("\n")
 
@@ -470,6 +487,7 @@ while num:
 
 f.close()
 result.close()
+
 
 # 以下为获得伴病网络等相关代码
 '''
