@@ -13,7 +13,6 @@ class Model(object):
         self.conn = MySQLdb.connect("localhost", "root", "10081008", "medical", charset='utf8')
         self.cursor = self.conn.cursor()
         self.data = self.load_data()
-
         self.alias_dict = loadDict("./Dict/Alias.txt")
 
         self.topK = 1
@@ -98,7 +97,7 @@ class Model(object):
                 cnt_sim_k += 1
             else:
                 str_pair = [k + ":" + str(v) for (k, v) in sort_name_list]
-                file.write("|".join([" ".join(p_name), candidate_top_k, "".join(str_pair), normalized_name, normalized_id]))
+                write_List(file, [" ".join(p_name), candidate_top_k, "".join(str_pair), normalized_name, normalized_id])
 
         file.close()
         print("Experiment: Test the basic disambiguation(top %d in the candidate includes the normalized disease name)" % self.topK)

@@ -14,6 +14,7 @@ class candidate_sim_generator():
         cursor.execute('select ICD,疾病名称 from I2025')
         values = cursor.fetchall()
         self.normal = getNormalNames(values)  # (normalized_name, ICD-10)
+        self.tfidf = pickle.load(open("vectorizerTFIDF.pickle", "rb"))
 
         self.alias_dict = loadDict("./Dict/Alias.txt")
 
@@ -22,7 +23,7 @@ class candidate_sim_generator():
     # is_single_segment = 0 说明诊断有多个片段
     def getCandidates(self, names_segs):
 
-        name_dict_seg = getMappingResult_segs(names_segs, self.normal)
+        name_dict_seg = getMappingResult_segs(names_segs, self.normal, self.tfidf)
         is_single_segment = 1 if len(names_segs) == 1 else 0
 
         # add alias

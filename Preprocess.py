@@ -52,11 +52,11 @@ def addBrotherNodes(segs, name_dict, icd4_dic, icd6_dict):
     return res
 
 # 计算entity和mention的相似度，传入icd6的关键词字典为了考虑tfidf相似度
-def sim_mention_entity(mention, e, icd6):
+def sim_mention_entity(mention, e, icd6, tfidf_dict):
     contain_entity = False
-
-    s_w = getWords(mention)
-    e_w = getWords(e)
+    sc = sim_computation()
+    s_w = sc.getWords(mention)
+    e_w = sc.getWords(e)
     intersect = set([p for p in s_w if p in e_w])
     s_p = pypinyin.lazy_pinyin(mention)
     t_p = pypinyin.lazy_pinyin(e)
@@ -69,20 +69,21 @@ def sim_mention_entity(mention, e, icd6):
         # 3拼音集合包含
         contain_entity = True
 
-    sim_w = sim_words_tfidf(mention, e, icd6)  #字集合和tfidf的相似度
-    sim_p = sim_pinyin(mention, e)  # 拼音的相似度
-    sim_edit = edit_distance_sim(mention, e) # 编辑距离的相似度
+    sim_w = sc.sim_words_tfidf(mention, e, icd6, tfidf_dict)  # 字集合和tfidf的相似度
+    sim_p = sc.sim_pinyin(mention, e)  # 拼音的相似度
+    sim_edit = sc.edit_distance_sim(mention, e) # 编辑距离的相似度
     sim = max(sim_p, max(sim_w, sim_edit)) # 相似度取最大
 
     return sim, contain_entity
 
 # 目前版本---考虑一个诊断包含多个疾病的情况，产生候选实体集合
-def getMappingResult_segs(name_segs, normalized_dic): #return name, flag(compute_brother_nodes)
+def getMappingResult_segs(name_segs, normalized_dic, tfidf_dict): #return name, flag(compute_brother_nodes)
     seg_sim = []
     length = len(name_segs)
     name_all_str = "".join(name_segs)
     str_l = {}
     al_match_flag = [False] * length
+    sc = sim_computation()
 
     if length != 1 and name_all_str in normalized_dic.keys(): # 整体的精确匹配
         str_l[name_all_str] = 1
@@ -114,12 +115,12 @@ def getMappingResult_segs(name_segs, normalized_dic): #return name, flag(compute
                     # disease_name_rm是去掉了部位的entity名称子串
                     disease_name_rm = re.sub(location_pattern, "", disease_name)
                     # entity和mention的部位的相似度
-                    sim_location = compare_location(location, disease_name_location)
+                    sim_location = sc.compare_location(location, disease_name_location)
                 else:
                     sim_location = -1
 
                 # entity和mention的去掉部位的相似度
-                sim_no_location, flag = sim_mention_entity(unormalized_rm_seg, disease_name_rm, icd6)
+                sim_no_location, flag = sim_mention_entity(unormalized_rm_seg, disease_name_rm, icd6, tfidf_dict)
 
                 #sim是综合sim_location和sim_no_location的相似度值
                 sim = sim_no_location * 0.85 # 初始值--也是entity（标准疾病名称）不包含部位的情况下和去掉部位的mention的相似度值
@@ -127,7 +128,7 @@ def getMappingResult_segs(name_segs, normalized_dic): #return name, flag(compute
                     # sim = sim_location / 3 + 2 * sim_no_location / 3
                     sim = sim_location * 0.29 + 0.71 * sim_no_location
 
-                contain_flag = determineContain(name_seg, disease_name) #判断name_seg是否包含了disease_name
+                contain_flag = sc.determineContain(name_seg, disease_name) #判断name_seg是否包含了disease_name
 
                 if sim >= 0.70 or contain_flag:
                 # if sim >= 0.70: # 对比
@@ -154,7 +155,7 @@ def getMappingResult_segs(name_segs, normalized_dic): #return name, flag(compute
 
         icd6 = normalized_dic[disease_name]
         if need_str_edit_match: #整体字符串的匹配
-            str_sim, str_contain_d = sim_mention_entity(name_all_str, disease_name, icd6) # 对于整体字符串的情况
+            str_sim, str_contain_d = sim_mention_entity(name_all_str, disease_name, icd6, tfidf_dict) # 对于整体字符串的情况
             if (str_contain_d and str_sim > 0.3) or str_sim >= 0.8:  # 半精确匹配
                 str_l[disease_name] = str_sim
 
@@ -170,8 +171,7 @@ def getMappingResult_segs(name_segs, normalized_dic): #return name, flag(compute
                 if len(entity_location) > 0: #对于诊断不含部位，标准名称有部位的情况，直接跳过（因为肯定不映射成功）
                     continue
 
-                # sim, contain_flag = sim_mention_entity(name_seg, disease_name)
-                sim, contain_flag = sim_mention_entity(name_seg, disease_name, icd6 )
+                sim, contain_flag = sim_mention_entity(name_seg, disease_name, icd6, tfidf_dict )
 
                 if (contain_flag and sim >= 0.30) or sim >= 0.8: # 半精确匹配
                     seg_sim[i][disease_name] = sim
@@ -196,7 +196,7 @@ def getMappingResult_segs(name_segs, normalized_dic): #return name, flag(compute
 def getMappingResult(name_segs, normalized_dic, icd6_keywords):
     name_str = "".join(name_segs)
     res = dict()
-
+    sc = sim_computation()
     # 精确匹配
     if name_str in normalized_dic.keys():
         res[name_str] = 1
@@ -207,7 +207,7 @@ def getMappingResult(name_segs, normalized_dic, icd6_keywords):
     location = re.findall(location_pattern, name_str)
 
     if len(location) != 0:  # 存在部位
-        unormalized_rm_segs = remove_location(name_segs)
+        unormalized_rm_segs = sc.remove_location(name_segs)
 
         for disease_name in normalized_dic.keys():
             # keywords = icd6_keywords[normalized_dic[disease_name]]
@@ -220,7 +220,7 @@ def getMappingResult(name_segs, normalized_dic, icd6_keywords):
                 # disease_name_rm是去掉了部位的entity名称子串
                 disease_name_rm = re.sub(location_pattern, "", disease_name)
                 # entity和mention的部位的相似度
-                sim_location = compare_location(location, disease_name_location)
+                sim_location = sc.compare_location(location, disease_name_location)
             else:
                 sim_location = -1
 
@@ -233,7 +233,7 @@ def getMappingResult(name_segs, normalized_dic, icd6_keywords):
                 # sim = sim_location / 3 + 2 * sim_no_location / 3
                 sim = sim_location * 0.29 + 0.71 * sim_no_location
 
-            contain_flag = determineContain(name_str, disease_name) #必须重新赋值，因为前面213行计算的是不包括部位的包含情况
+            contain_flag = sc.determineContain(name_str, disease_name) #必须重新赋值，因为前面213行计算的是不包括部位的包含情况
 
             if sim >= 0.70 or contain_flag:
             # if sim >= 0.70:#对比
@@ -279,21 +279,22 @@ def sim_segs_entity(segs, e):
     sp_str = "".join(sp)
     tp_str = "".join(tp)
 
-    s_w = getWords(name_str)
-    e_w = getWords(e)
+    sc = sim_computation
+    s_w = sc.getWords(name_str)
+    e_w = sc.getWords(e)
     intersect = [p for p in s_w if p in e_w]
 
     if sp_str.find(tp_str) != -1 or len(intersect) == len(e_w) or len(intersect_p) == len(tp):
         contain_entity = True
-    sim_all_w = sim_words(name_str, e)
-    sim_all_p = sim_pinyin(name_str, e)
+    sim_all_w = sc.sim_words(name_str, e)
+    sim_all_p = sc.sim_pinyin(name_str, e)
     sim_s = max(sim_all_p, sim_all_w)
 
     sim_seg_w = 0
     sim_seg_p = 0
     for seg in segs:
-        sim_seg_w = max(edit_distance_sim(seg, e), sim_seg_w)
-        sim_seg_p = max(sim_pinyin(seg, e), sim_seg_p)
+        sim_seg_w = max(sc.edit_distance_sim(seg, e), sim_seg_w)
+        sim_seg_p = max(sc.sim_pinyin(seg, e), sim_seg_p)
 
     sim = max(sim_s, max(sim_seg_p, sim_seg_w))
     return sim, contain_entity

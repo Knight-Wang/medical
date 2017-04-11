@@ -3,7 +3,8 @@
 import jieba
 import sys
 import re
-import MySQLdb
+import MySQLdb, pickle
+from sklearn.externals import joblib
 from Preprocess import *
 from util import getICD3Tree, getNormalNames
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -12,7 +13,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 class ICD_Keywords:
 
     icd6_keywords_file = "./Dict/ICD_Keywords.txt"
-    keywords_set_file = "./Dict/ICD_Keywords_Dict.txt"
+    keywords_set_file = "./Dict/ICD_Keywords_Dict_all.txt"
 
     def getFeatureEntity(self, normal): #normal(entity, ICD10)
         features = {}
@@ -28,6 +29,11 @@ class ICD_Keywords:
         #TF-IDF to get keywords of each entity in normalized dictionary
         vectorizer = TfidfVectorizer()
         tfidf = vectorizer.fit_transform(corpus)
+
+        # Save vectorizer.vocabulary_
+        with open('vectorizerTFIDF.pickle', 'wb') as idxf:
+            pickle.dump(vectorizer, idxf, pickle.HIGHEST_PROTOCOL)
+
         words = vectorizer.get_feature_names()
         i = 0
         for icd in icd_list:
@@ -46,15 +52,25 @@ class ICD_Keywords:
         icd3_dic = getICD3Tree(normal)
         result = {}
         keywords = []
+
+        names_dic = {}
         for icd3, names in icd3_dic.iteritems():
-            names_dic = {}
             for (k, v) in names:
                 names_dic[k] = v
-            res = self.getFeatureEntity(names_dic)
-            for (k, v) in res.iteritems():
-                result[k] = sorted(v.items(), key=lambda e: e[1], reverse=True)
-                keywords.extend(v.keys())
-        return result, set(keywords)
+        res = self.getFeatureEntity(names_dic)
+
+
+        # # 每一个三位码当做一个corpus，用tf-idf模型计算
+        # for icd3, names in icd3_dic.iteritems():
+        #     names_dic = {}
+        #     for (k, v) in names:
+        #         names_dic[k] = v
+        #     res = self.getFeatureEntity(names_dic)
+            # for (k, v) in res.iteritems():
+            #     result[k] = sorted(v.items(), key=lambda e: e[1], reverse=True)
+            #     keywords.extend(v.keys())
+        return result
+        # return result, set(keywords)
 
     def writeInFile_Dict(self):
         reload(sys)
@@ -67,11 +83,12 @@ class ICD_Keywords:
         values = cursor.fetchall()
         normal = getNormalNames(values)  # (normalized_name, ICD-10)
 
-        icd6_keywords, keywords_set = self.loadICD6Features(normal)  # (icd6, keywords dict)
+        icd6_keywords = self.loadICD6Features(normal)  # (icd6, keywords dict)
+        # icd6_keywords, keywords_set = self.loadICD6Features(normal)  # (icd6, keywords dict)
 
-        file = open(self.icd6_keywords_file, "w+")
-        file.write(",".join(keywords_set))
-        file.close()
+        # file = open(self.icd6_keywords_file, "w+")
+        # file.write(",".join(keywords_set))
+        # file.close()
 
         file = open(self.keywords_set_file, "w+")
         for (icd6, keywords) in icd6_keywords.iteritems():
