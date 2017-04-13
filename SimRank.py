@@ -76,7 +76,8 @@ class SimRank(object):
         # print "trans ratio:"
         # print self.trans_matrix
         for i in range(self.iter):
-            print "iteration %d" % (i + 1)
+            if not (i % 20):
+                print "iteration %d" % (i + 1)
             self.iterate()
 
     # 得到结果
