@@ -30,25 +30,25 @@ def init():
 
     print '标准手术名称个数为 %d' % len(normal_surgeries)
 
-    # medical_records_2013 = d.query('select  S050100, S050200, S050600, S050700, \
-    #                                         S050800, S050900, S051000, S051100, \
-    #                                         S056000, S056100, S056200, \
-    #                                         S050501, S051201, S051301, S051401, \
-    #                                         S051501, S057001, S057101, S057201, \
-    #                                         S057301, S057401 \
-    #                                    from heart_new_2013')
+    medical_records_2013 = d.query('select  S050100, S050200, S050600, S050700, \
+                                            S050800, S050900, S051000, S051100, \
+                                            S056000, S056100, S056200, \
+                                            S050501, S051201, S051301, S051401, \
+                                            S051501, S057001, S057101, S057201, \
+                                            S057301, S057401 \
+                                       from heart_new_2013')
 
-    medical_records_2014_15 = d.query('select  S050100, S050200, S050600, S050700, \
-                                               S050800, S050900, S051000, S051100, \
-                                               S056000, S056100, S056200, \
-                                               S050501, S051201, S051301, S051401, \
-                                               S051501, S057001, S057101, S057201, \
-                                               S057301, S057401 \
-                                          from heart_new limit 100000')
+    # medical_records_2014_15 = d.query('select  S050100, S050200, S050600, S050700, \
+    #                                            S050800, S050900, S051000, S051100, \
+    #                                            S056000, S056100, S056200, \
+    #                                            S050501, S051201, S051301, S051401, \
+    #                                            S051501, S057001, S057101, S057201, \
+    #                                            S057301, S057401 \
+    #                                       from heart_new limit 100000')
 
     # medical_records_2013[len(medical_records_2013):len(medical_records_2013)] = medical_records_2014_15
 
-    print '医疗记录为 %d 条' % len(medical_records_2014_15)
+    print '医疗记录为 %d 条' % len(medical_records_2013)
 
     values = d.query('select 非标准名称, 标准疾病名 from LabeledData_3')
     labeled_data = {}
@@ -57,7 +57,7 @@ def init():
 
     print '测试数据个数为 %d' % len(labeled_data)
 
-    return normal_diseases, normal_surgeries, medical_records_2014_15, labeled_data
+    return normal_diseases, normal_surgeries, medical_records_2013, labeled_data
 
 
 def get_graph(normal_diseases, normal_surgeries, medical_records, labeled_data):
@@ -74,6 +74,7 @@ def get_graph(normal_diseases, normal_surgeries, medical_records, labeled_data):
     cnt_n = 0  # 标准疾病名称的数量
     cnt_all = 0  # 医疗记录的数量
     cnt_n_s = 0  # 标准手术名称
+    res = {}
     for t in medical_records:
         cnt_all += 1
         if not (cnt_all % 100000):
@@ -91,6 +92,10 @@ def get_graph(normal_diseases, normal_surgeries, medical_records, labeled_data):
                     cnt_n += 1
                 elif s in labeled_data.keys():
                     cnt_u_in += 1
+                    if s not in res:
+                        res[s] = 1
+                    else:
+                        res[s] += 1
                 else:
                     cnt_u_not_in += 1
             else:
@@ -103,6 +108,8 @@ def get_graph(normal_diseases, normal_surgeries, medical_records, labeled_data):
     print '在字典中的非标准疾病名称 %d' % cnt_u_in
     print '不在字典中的非标准疾病名称 %d' % cnt_u_not_in
     print '标准手术名称 %d' % cnt_n_s
+    for k, v in res.iteritems():
+        print k, v
 
 normal_dis, normal_sur, records, labeled_data = init()
 get_graph(normal_dis, normal_sur, records, labeled_data)
