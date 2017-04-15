@@ -9,7 +9,7 @@ import MySQLdb
 class candidate_sim_generator():
 
     def __init__(self):
-        conn = MySQLdb.connect("localhost", "root", "10081008", "medical", charset='utf8')
+        conn = MySQLdb.connect("localhost", "root", "123456", "medical", charset='utf8')
         cursor = conn.cursor()
         cursor.execute('select ICD,疾病名称 from I2025')
         values = cursor.fetchall()

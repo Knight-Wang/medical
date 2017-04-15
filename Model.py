@@ -10,7 +10,7 @@ from candidate_sim_generator import candidate_sim_generator
 class Model(object):
 
     def __init__(self):
-        self.conn = MySQLdb.connect("localhost", "root", "10081008", "medical", charset='utf8')
+        self.conn = MySQLdb.connect("localhost", "root", "123456", "medical", charset='utf8')
         self.cursor = self.conn.cursor()
         self.data = self.load_data()
         self.alias_dict = loadDict("./Dict/Alias.txt")
