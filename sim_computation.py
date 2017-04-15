@@ -5,7 +5,7 @@ from scipy import spatial
 import numpy as np
 from sklearn.externals import joblib
 from sklearn.feature_extraction.text import TfidfVectorizer, TfidfTransformer,CountVectorizer
-from util import loadICD_Keywords_Dict, loadICD_Keywords_Set
+from util import loadICD_Keywords_Dict
 
 class sim_computation:
 
