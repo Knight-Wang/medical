@@ -12,8 +12,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 # 用TF-iDF生成标准疾病字典中的关键词，存入文件中
 class ICD_Keywords:
 
-    icd6_keywords_file = "./Dict/ICD_Keywords.txt"
-    keywords_set_file = "./Dict/ICD_Keywords_Dict_all.txt"
+    keywords_set_file = "./Dict/ICD_Keywords_Dict.txt"
 
     def getFeatureEntity(self, normal): #normal(entity, ICD10)
         features = {}
@@ -69,7 +68,7 @@ class ICD_Keywords:
             # for (k, v) in res.iteritems():
             #     result[k] = sorted(v.items(), key=lambda e: e[1], reverse=True)
             #     keywords.extend(v.keys())
-        return result
+        return res
         # return result, set(keywords)
 
     def writeInFile_Dict(self):
@@ -92,7 +91,7 @@ class ICD_Keywords:
 
         file = open(self.keywords_set_file, "w+")
         for (icd6, keywords) in icd6_keywords.iteritems():
-            key_str = [k + ":" + str(v) for (k, v) in keywords]
+            key_str = [k + ":" + str(v) for (k, v) in keywords.items()]
             file.write(icd6 + "-" + ",".join(key_str) + "\n")
         file.close()
 
