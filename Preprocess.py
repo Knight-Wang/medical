@@ -1,19 +1,22 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 import jieba
+import os
 import sys
 import re
 import pypinyin, Levenshtein
-import MySQLdb
+#import MySQLdb
 from util import loadDict
 from sim_computation import *
 
 reload(sys)
 sys.setdefaultencoding('utf8')
 
+CURRENT_DIR = os.path.abspath("%s/../" % __file__)
+
 #对诊断进行预处理，在分隔符处分开
 def process(str):
-    acronym = loadDict("./Dict/Acronym.txt") # 载入缩写字典
+    acronym = loadDict(os.path.join(CURRENT_DIR, "./Dict/Acronym.txt")) # 载入缩写字典
     keys = acronym.keys()
 
     #将缩写替换
@@ -298,7 +301,7 @@ def sim_segs_entity(segs, e):
     sp_str = "".join(sp)
     tp_str = "".join(tp)
 
-    sc = sim_computation
+    sc = sim_computation()
     s_w = sc.getWords(name_str)
     e_w = sc.getWords(e)
     intersect = [p for p in s_w if p in e_w]
