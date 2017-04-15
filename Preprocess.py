@@ -54,6 +54,14 @@ def addBrotherNodes(segs, name_dict, icd4_dic, icd6_dict):
                 res[brothernode] = sim_b
     return res
 
+
+def determineNeg(s):
+    Negset = ["不", "非"]
+    for neg in Negset:
+        if neg in s:
+            return 1
+    return 0
+
 # 计算entity和mention的相似度，传入icd6的关键词字典为了考虑tfidf相似度
 def sim_mention_entity(mention, e, icd6, tfidf_dict):
     contain_entity = False
@@ -75,6 +83,9 @@ def sim_mention_entity(mention, e, icd6, tfidf_dict):
     sim_w = sc.sim_words_tfidf(mention, e, icd6, tfidf_dict)  # 字集合和tfidf的相似度
     sim_p = sc.sim_pinyin(mention, e)  # 拼音的相似度
     sim_edit = sc.edit_distance_sim(mention, e) # 编辑距离的相似度
+    sim_jaro = Levenshtein.jaro_winkler(mention, e) # 编辑距离的相似度
+
+    sim_edit = (sim_edit + sim_jaro) / 2
     sim = max(sim_p, max(sim_w, sim_edit)) # 相似度取最大
 
     return sim, contain_entity
@@ -110,6 +121,10 @@ def getMappingResult_segs(name_segs, normalized_dic, tfidf_dict): #return name, 
             unormalized_rm_seg = re.sub(ur"[上下左右正前后侧][间壁室]+", "", name_seg)
 
             for disease_name in normalized_dic.keys():
+                # determine whether it contains negative word
+                if determineNeg(disease_name) != determineNeg(name_seg):
+                    continue
+
                 icd6 = normalized_dic[disease_name]
                 disease_name_location = re.findall(location_pattern, disease_name)
                 disease_name_rm = disease_name # 去掉部位的标准疾病名称(entity)，若本身不包含部位，即为原标准疾病名
@@ -155,9 +170,10 @@ def getMappingResult_segs(name_segs, normalized_dic, tfidf_dict): #return name, 
 
     name_sets = list(set(normalized_dic.keys()) - set(seg_sim_names))
     for disease_name in name_sets:
-
         icd6 = normalized_dic[disease_name]
         if need_str_edit_match: #整体字符串的匹配
+            if determineNeg(name_all_str) != determineNeg(disease_name):
+                continue
             str_sim, str_contain_d = sim_mention_entity(name_all_str, disease_name, icd6, tfidf_dict) # 对于整体字符串的情况
             if (str_contain_d and str_sim > 0.3) or str_sim >= 0.8:  # 半精确匹配
                 str_l[disease_name] = str_sim
@@ -167,13 +183,16 @@ def getMappingResult_segs(name_segs, normalized_dic, tfidf_dict): #return name, 
 
         for i in range(length):
             name_seg = name_segs[i]
+            if determineNeg(name_seg) != determineNeg(disease_name):
+                continue
 
             if al_match_flag[i] == False: # 说明精确匹配和部位的语义匹配未成功，进入半精确匹配和模糊匹配
 
                 entity_location = re.findall(location_pattern, disease_name)
                 if len(entity_location) > 0: #对于诊断不含部位，标准名称有部位的情况，直接跳过（因为肯定不映射成功）
                     continue
-
+                # if name_seg == "亚急性ST段抬高型心肌梗死" and disease_name == "急性透壁心肌梗塞":
+                #     print("")
                 sim, contain_flag = sim_mention_entity(name_seg, disease_name, icd6, tfidf_dict )
 
                 if (contain_flag and sim >= 0.30) or sim >= 0.8: # 半精确匹配

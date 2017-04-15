@@ -52,12 +52,14 @@ class Model(object):
     def load_data(self):
         cursor = self.cursor
         cursor.execute('select ICD, 非标准名称, 标准疾病名 from LabeledData limit 10000;')  # index, unormalized_name
+        # cursor.execute('select ICD, 非标准名称, 标准疾病名 from LabeledData where ICD=\'I21.203111 \';') #index, unormalized_name
         values = cursor.fetchall()
         return values
 
     def begin(self):
 
         file = open(self.dir + "/disambiguate_res.txt", "w")
+        discorrect_file = open(self.dir + "/dis_correct.txt", "w")
         cnt_sim_k = 0
         generator = candidate_sim_generator()
 
@@ -91,18 +93,21 @@ class Model(object):
                 self.write_cases(normalized_name, name_dict, sort_name_list, p_name, normalized_id)
 
             candidate_top_k = basicDisambiguation_top1(top_candidate, self.priorProb, self.icd3_names, self.normal)
+            str_pair = [k + ":" + str(v) for (k, v) in sort_name_list]
             if normalized_name == candidate_top_k or \
                     (candidate_top_k in self.alias_dict.keys() and normalized_name == self.alias_dict[candidate_top_k]):
                 # 标准疾病名称 = top1 或者top1的alias就认为正确
                 cnt_sim_k += 1
+                write_List(discorrect_file,  [" ".join(p_name), candidate_top_k, "".join(str_pair), normalized_name, normalized_id])
             else:
-                str_pair = [k + ":" + str(v) for (k, v) in sort_name_list]
+
                 write_List(file, [" ".join(p_name), candidate_top_k, "".join(str_pair), normalized_name, normalized_id])
 
         file.close()
         print("Experiment: Test the basic disambiguation(top %d in the candidate includes the normalized disease name)" % self.topK)
         print(cnt_sim_k)
         print(float(cnt_sim_k) / float(len(self.data)))
+        self.evaluate()
 
     def write_cases(self, normalized_name, name_dict, sort_name_list, p_name, normalized_id):
             len_candidates = len(name_dict)
@@ -128,7 +133,7 @@ class Model(object):
             evaluation_file.write('标准疾病名称个数为 %d\n' % len(self.normal))
             evaluation_file.write('正确分类的记录个数为 %d\n' % self.cnt)
             evaluation_file.write('能映射，但是分类到其他疾病名称的记录个数为 %d\n' % self.other_nt)
-            evaluation_file.write('非标准疾病名称个数为 %d\n' % len(self.values))
+            evaluation_file.write('非标准疾病名称个数为 %d\n' % len(self.data))
             accuracy = float(self.cnt) / float(len(self.data))
             evaluation_file.write('正确分类的比例为 %f\n' % accuracy)
             evaluation_file.write('运行时间' + str(endtime - self.starttime) + "\n")

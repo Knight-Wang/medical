@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import pypinyin, re, jieba, pickle
 from scipy import spatial
+import numpy as np
 from sklearn.externals import joblib
 from sklearn.feature_extraction.text import TfidfVectorizer, TfidfTransformer,CountVectorizer
 from util import loadICD_Keywords_Dict, loadICD_Keywords_Set
@@ -116,20 +117,20 @@ class sim_computation:
             icd6_keywords = loadICD_Keywords_Dict()
 
             t_words = icd6_keywords[icd6]
-            words = loadICD_Keywords_Set()
-            t_vector = []
-            s_segs_tfidf = tfidf_dict.transform([" ".join(list(jieba.cut(s)))]).todense() # change from sparse matrix to vector
+            tmp = " ".join(list(jieba.cut(s)))
+
+            s_segs_tfidf = tfidf_dict.transform([tmp]).todense() # change from sparse matrix to vector
 
             t_words_entity = [t for (t, v) in t_words]
             t_words_tfidf = [v for (t, v) in t_words]
+            words = tfidf_dict.vocabulary_
 
-            for word in words:
+            t_vector = np.zeros(len(words))
+            for (word, index) in words.items():
 
                 if word in t_words_entity:
                     value = t_words_tfidf[t_words_entity.index(word)]
-                    t_vector.append(value)
-                else:
-                    t_vector.append(0.0)
+                    t_vector[index] = value
 
             if s_segs_tfidf.sum() == 0: # 均匹配不上
                 sim_tfidf = 0
