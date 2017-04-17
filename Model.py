@@ -218,5 +218,8 @@ class Model(object):
 
 x = Model()
 #目前---考虑一个诊断包含多个病症，对每个片段生成候选实体集和，进行消岐
-x.begin()
-# x.begin_version1() # 不考虑诊断包含多个病症的消歧
+# x.begin()
+start = datetime.datetime.now()
+x.begin_version1() # 不考虑诊断包含多个病症的消歧
+end = datetime.datetime.now()
+print (end - start).seconds
