@@ -9,12 +9,16 @@
 /main_new_texts/
 /iteration_texts/
 /filtered_records/
-
+/iteration_algorithm/res/
+/iteration_simrank/res/
 # csv
 *.csv
 
 #pyc
 *.pyc
+
+#bin
+*.bin
 
 # other
 .idea/
