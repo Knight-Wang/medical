@@ -2,11 +2,16 @@
 # -*- coding: utf-8 -*-
 """
 Author: sunmeng(sunmeng94@163.com)
+
+测试准确率
 """
 from conf import *
 import processor
 
 def alias_mapping(name):
+    """
+    等价映射
+    """
     if name == u"变异型心绞痛":
         return u"冠状动脉痉挛"
     elif name == u"增强型心绞痛":
@@ -16,6 +21,9 @@ def alias_mapping(name):
 
 class Tester():
     def __init__(self):
+        """
+        读入测试数据及真值
+        """
         self.records = []
         self.groundtruth = []
         for line in open(TEST_FILE, "r"):
@@ -40,6 +48,9 @@ class Tester():
             self.groundtruth.append(groundtruth)
     
     def test(self, processor, suffix="nosuffix"):
+        """
+        准确率测试
+        """
         correct, wrong = 0, 0
         badcases = {}
         with open("../res/test.log.%s" % suffix, "w") as f_out:
@@ -77,7 +88,7 @@ class Tester():
                     for m in mentions:
                         print >> f_out, ("%s\t%.8f" % (m, processor.network.popSim(m))).encode("UTF-8")
             print >> f_out, "Correct: %d\nWrong: %d\n" % (correct, wrong)
-        print "Correct: %d\nWrong: %d\nPercent: %.6f" % (correct, wrong, float(correct) / (correct + wrong))
+        print "Correct: %d\nWrong: %d\nAccuracy Rate: %.6f" % (correct, wrong, float(correct) / (correct + wrong))
         #for badcase in badcases:
         #    print badcase[0], badcase[1], badcases[badcase]
 
