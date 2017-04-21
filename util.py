@@ -43,13 +43,6 @@ def loadDict(filename):
         res[n2.decode("utf-8")] = n1.decode("utf-8")
     return res
 
-# 载入icd6的关键词字典
-def loadICD_Keywords_Set():
-    file = open("./Dict/ICD_Keywords.txt")
-    line = file.readline()
-    words = line.split(",")
-    return words
-
 # 载入icd6的关键词集合，已去重
 def loadICD_Keywords_Dict():
     file = open("./Dict/ICD_Keywords_Dict.txt")

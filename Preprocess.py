@@ -182,6 +182,7 @@ def getMappingResult_segs(name_segs, normalized_dic, tfidf_dict): #return name, 
                 tmp_str[disease_name] = str_sim
 
         for i in range(length):
+            tmpi = {}
             name_seg = name_segs[i]
             if determineNeg(name_seg) != determineNeg(disease_name):
                 continue
@@ -191,15 +192,14 @@ def getMappingResult_segs(name_segs, normalized_dic, tfidf_dict): #return name, 
                 entity_location = re.findall(location_pattern, disease_name)
                 if len(entity_location) > 0: #对于诊断不含部位，标准名称有部位的情况，直接跳过（因为肯定不映射成功）
                     continue
-                # if name_seg == "亚急性ST段抬高型心肌梗死" and disease_name == "急性透壁心肌梗塞":
-                #     print("")
                 sim, contain_flag = sim_mention_entity(name_seg, disease_name, icd6, tfidf_dict )
 
                 if (contain_flag and sim >= 0.30) or sim >= 0.8: # 半精确匹配
                     seg_sim[i][disease_name] = sim
 
                 elif sim >= 0.65: # 模糊匹配,暂时不放入seg_sim中，在tmp中存
-                    tmp[i][disease_name] = sim
+                    tmpi[disease_name] = sim
+        tmp[i] = tmpi
 
     for i in range(length):
         candidates = seg_sim[i]
