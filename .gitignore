@@ -11,6 +11,8 @@
 /filtered_records/
 /iteration_algorithm/res/
 /iteration_simrank/res/
+/simrank_new/res/
+
 # csv
 *.csv
 
