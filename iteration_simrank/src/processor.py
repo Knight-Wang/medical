@@ -7,6 +7,8 @@ import cPickle
 import math
 import numpy as np
 import sys
+import copy
+import random
 
 import candidate_generator
 from conf import *
@@ -21,7 +23,7 @@ def process_record(record):
         for name in record[key]:
             candidates = candidate_generator.generate_candidate(name)
             if len(candidates) == 0:
-                candidates = [(u"急性心肌梗死", 0.0)]
+                candidates = [(u"急性ST段抬高型心肌梗塞", 0.0)]
             pred_record[key].append(candidates)
     return pred_record
 
@@ -57,12 +59,12 @@ class Network:
         for i in range(self.n):
             for j in range(self.n):
                 self.matrix[i, j] = math.log(self.matrix[i, j] + 1)
-        nonzero_row_index, nonzero_col_index = np.nonzero(self.matrix)
-        total = len(nonzero_row_index)
-        for i in range(total):
-            x = nonzero_row_index[i]
-            y = nonzero_col_index[i]
-            #print self.id2name[x], self.id2name[y], self.matrix[x][y]
+        # nonzero_row_index, nonzero_col_index = np.nonzero(self.matrix)
+        # total = len(nonzero_row_index)
+        # for i in range(total):
+        #    x = nonzero_row_index[i]
+        #    y = nonzero_col_index[i]
+        #    print self.id2name[x], self.id2name[y], self.matrix[x][y]
 
     def edge(self, name1, name2):
         #print name1, name2, self.matrix[self.name2id[name1], self.name2id[name2]]
@@ -75,6 +77,7 @@ class Network:
 class Processor:
     def __init__(self):
         self.network = None
+        self.sim_matrix = None
     
     def set_network(self, network):
         self.network = network
@@ -95,120 +98,96 @@ class Processor:
         except:
             print >> sys.stderr, "Network file is not available"
 
-    def personalized_page_rank(self, s, matrix):
-        e = np.zeros((matrix.shape[0], 1), dtype = float)
-        e[s] = 1
-        w = e
-        for k in range(PPR_ITERATION_TIMES):
-            w = (1 - PPR_JUMP_PROB) * np.dot(matrix, w) + PPR_JUMP_PROB * e
-        return w
+    def simrank(self):
+        """ simrank 算法，计算任意两个标准疾病名称之间的相似度
+        :return: 相似度矩阵
+        """
+        trans_matrix = copy.deepcopy(self.network.matrix)  # 转移概率矩阵
+        col_sum = np.sum(trans_matrix, axis=0)
+        n = len(col_sum)
+        for j in range(n):
+            if col_sum[j] > 0:
+                for i in range(n):
+                    trans_matrix[i, j] /= col_sum[j]
+        # print trans_matrix
+        self.sim_matrix = np.identity(n) * (1.0 - SIMRANK_DAMP)
 
-    def disambiguate(self, record, preprocessed_record=None):
+        for i in range(SIMRANK_ITERATION_TIMES):
+            self.sim_matrix = SIMRANK_DAMP * np.dot(np.dot(trans_matrix.transpose(), self.sim_matrix), trans_matrix) \
+                              + (1.0 - SIMRANK_DAMP) * np.identity(n)
+
+    def cal_sim(self, neigh_list):
+        """ 计算某个候选名称与邻居集合的相似度
+        :param neigh_list: 非标准疾病名称的邻居列表
+        :return: 相似度
+        """
+        if not len(neigh_list):
+            return 0.0
+        total_sim = 0.0
+        for i in range(self.network.n):
+            for j in range(len(neigh_list)):
+                id = self.network.name2id[neigh_list[j]]
+                if i != id:
+                    total_sim += self.sim_matrix[i, id]
+        total_sim /= self.network.n
+        total_sim /= len(neigh_list)
+        return total_sim
+
+    def disambiguate_simrank(self, record, preprocessed_record=None):
+        """ 使用 simrank 进行消歧
+        :param record: 原始记录
+        :param preprocessed_record: 处理过的记录
+        :return: 重新处理过的记录
+        """
         if preprocessed_record is None:
             preprocessed_record = process_record(record)
         if self.network is None:
             return preprocessed_record
 
-        vertex_mapping = {
-            "main": [],
-            "other": []
-        }
-        vertex_max = {
-            "main": [],
-            "other": []
-        }
-        vertexes = []
-        for key in preprocessed_record:
-            for i, name_group in enumerate(preprocessed_record[key]):
-                vertex_ids = []
-                vertex_max[key].append(len(vertexes))
-                sum_iSim = 0.0
-                for name, value in name_group:
-                    vertex = {
-                        "home": (key, i),
-                        "name": name,
-                        "iSim": POPSIM_FACTOR *self.network.popSim(name) + value
-                    }
-                    #print self.network.popSim(name), value
-                    vertex_ids.append(len(vertexes))
-                    vertexes.append(vertex)
-                    sum_iSim += vertex["iSim"]
-                if sum_iSim > 0:
-                    for k in vertex_ids:
-                        vertexes[k]["iSim"] /= sum_iSim
-                vertex_mapping[key].append(vertex_ids)
-        for i, vertex in enumerate(vertexes):
-            #print i, vertex["name"]
-            #print vertex["home"], vertex["name"], vertex["iSim"]
-            pass
-        n = len(vertexes)
-        matrix = np.zeros([n, n])
-        for i, v1 in enumerate(vertexes):
-            for j, v2 in enumerate(vertexes):
-                if i != j:
-                    matrix[i, j] = self.network.edge(v1["name"], v2["name"])
-        row_sum = np.sum(matrix, axis=1)
-        for i in range(n):
-            if row_sum[i] > 0:
-                for j in range(n):
-                    matrix[i, j] /= row_sum[i]
-        matrix = np.transpose(matrix)
-        ppr_matrix = np.zeros([n, 0])
-        for i, vertex in enumerate(vertexes):
-            w = self.personalized_page_rank(i, matrix)
-            ppr_matrix = np.column_stack((ppr_matrix, w))
-        for k in range(100):
-            coh = [0] * n
-            ppr_sum = 0
-            for e in range(n):
-                if k == 0:
-                    s_array = range(n)
+        all_names = {"main": [], "other": []}  # 先把这条记录中的所有名称对应的标准名称统一放到一个字典里面
+        for key in record:
+            for candidate_list in preprocessed_record[key]:
+                all_names[key].append(candidate_list[0][0])
+
+        res_record = {"main": [], "other": []}  # 返回结果
+
+        for key in record:
+            for i, u_name in enumerate(record[key]):
+                neigh = []  # 找到非标准疾病名称的邻居
+                for key1 in all_names:
+                    if key1 != key:
+                        for n_name in all_names[key1]:
+                            neigh.append(n_name)
+                    else:
+                        for j, n_name in enumerate(all_names[key1]):
+                            if i == j:
+                                continue
+                            neigh.append(n_name)
+
+                candidate_list = preprocessed_record[key][i]  # 得到非标准疾病名称的候选列表
+                res_list = []  # 结果列表
+                sim_sum = 0.0  # 归一化
+                tmp_sim = []
+                for j, c in enumerate(candidate_list):
+                    sim = self.cal_sim(neigh)
+                    tmp_sim.append(sim)
+                    sim_sum += sim
+                if sim_sum > 1e-6:
+                    for j in range(len(tmp_sim)):
+                        tmp_sim[j] /= sim_sum
+                    for j, c in enumerate(candidate_list):  # c[0]候选标准疾病名称，c[1]相似度
+                        # print tmp_sim[j], c[1]
+                        sim = SIMRANK_FACTOR * tmp_sim[j] + (1 - SIMRANK_FACTOR) * c[1]
+                        # print sim
+                        res_list.append((c[0], sim))
+                    res_list = sorted(res_list, key=lambda x: x[1], reverse=True)
                 else:
-                    s_array = []
-                    for key in vertex_max:
-                        s_array += vertex_max[key]
-                for s in s_array:
-                    if vertexes[s]["home"] != vertexes[e]["home"]:
-                        coh[e] += ppr_matrix[s, e] * vertexes[e]["iSim"]
-                        ppr_sum += ppr_matrix[s, e]
-                        #print k, e, s, ppr_matrix[s, e], coh[e]
-            ppr_avg = ppr_sum / n
-            score = [0] * n
-            for e in range(n):
-                score[e] = coh[e] + ppr_avg * vertexes[e]["iSim"]
-                #print e, coh[e], ppr_avg * vertexes[e]["iSim"], score[e]
-            changed = False
-            for key in vertex_max:
-                for i, vertex_list in enumerate(vertex_mapping[key]):
-                    #print vertex_list
-                    max_id, max_score = -1, -1
-                    for e in vertex_list:
-                        if max_id == -1 or score[e] > max_score:
-                            max_id, max_score = e, score[e]
-                    if max_id != vertex_max[key][i]:
-                        changed = True
-                        vertex_max[key][i] = max_id
-            if not changed:
-                break
-            #print vertex_max
-        #print vertex_max
-        #print record
-        #print preprocessed_record
-        res_record = {
-            "main": [[] for i in range(len(preprocessed_record["main"]))],
-            "other": [[] for i in range(len(preprocessed_record["other"]))],
-        }
-        for i, vertex in enumerate(vertexes):
-            key, order = vertex["home"]
-            #print order
-            res_record[key][order].append((vertex["name"], score[i]))
-        #print res_record
-        for key in res_record:
-            for i, res_list in enumerate(res_record[key]):
-                res_record[key][i] = sorted(res_list, key=lambda x: x[1], reverse=True)
-        #print res_record
+                    res_list = candidate_list
+                res_record[key].append(res_list)
+
         return res_record
 
 
 processor = Processor()
 processor.load_network()
+

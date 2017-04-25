@@ -45,7 +45,7 @@ class Tester():
         with open("../res/test.log.%s" % suffix, "w") as f_out:
             for i, record in enumerate(self.records):
                 print >> f_out, "------------------ Record %d ----------------------" % i
-                res = processor.disambiguate(record)
+                res = processor.disambiguate_simrank(record)
                 mentions = []
                 for key in record:
                     for j, mention in enumerate(record[key]):
@@ -78,8 +78,8 @@ class Tester():
                         print >> f_out, ("%s\t%.8f" % (m, processor.network.popSim(m))).encode("UTF-8")
             print >> f_out, "Correct: %d\nWrong: %d\n" % (correct, wrong)
         print "Correct: %d\nWrong: %d\nPercent: %.6f" % (correct, wrong, float(correct) / (correct + wrong))
-        #for badcase in badcases:
-        #    print badcase[0], badcase[1], badcases[badcase]
+        # for badcase in badcases:
+        #     print badcase[0], badcase[1], badcases[badcase]
 
 if __name__ == "__main__":
     tester = Tester()

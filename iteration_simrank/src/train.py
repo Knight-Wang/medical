@@ -61,9 +61,11 @@ if __name__ == "__main__":
     processor.set_network(network)
     for i in range(NUM_ITERATION):
         print "---------- Iteration %d ----------" % i
+        processor.simrank()  # 使用simrank算法得到任意两点之间的相似度
+        # print processor.sim_matrix
         tester.test(processor, str(i))
         for j, preprocessed_record in enumerate(preprocessed_records):
-            preprocessed_records[j] = processor.disambiguate(origin_records[j], preprocessed_record)
+            preprocessed_records[j] = processor.disambiguate_simrank(origin_records[j], preprocessed_record)
         network = Network(preprocessed_records)
         processor.set_network(network)
         processor.save_network()

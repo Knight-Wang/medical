@@ -4,6 +4,7 @@
 import os
 import sys
 import networkx as nx
+import cPickle
 
 sys.path.append(os.path.abspath("%s/../../.." % __file__))
 from Preprocess import *
@@ -12,6 +13,7 @@ from conf import *
 DICT_FILE = "../data/i2025.txt"
 disease_dict = {}
 candidate_cache = {}
+init_res = {}  # 初始相似度较高的
 loop = 0
 for line in open(DICT_FILE, "r"):
     loop += 1
@@ -62,18 +64,26 @@ def generate_network():
                     can_list = [(u'急性心肌梗死', 0.0)]
                 if can_list[0][1] > THRESHOLD:  # 相似度大于阈值
                     G.add_node(can_list[0][0], type=1)
+                    if name not in init_res:
+                        init_res[name] = can_list[0][0]
                     name_list.append(can_list[0][0])
                 else:  # 相似度小于阈值，消歧的对象
                     G.add_node(name, type=0)
                     name_list.append(name)
         for p, np in enumerate(name_list):  # 添加疾病之间的边
             for q, nq in enumerate(name_list):
-                if p == q:
+                if p >= q:
                     continue
                 if G.has_edge(np, nq):  # ni, nj有边，调整权值
                     G[np][nq]["weight"] += 1
                 else:  # ni, nj之间没有边，加边
                     G.add_edge(np, nq, weight=1)
+
+    # 把没出现过的标准疾病名称加入到G中，方便后续操作
+    for n_name in disease_dict:
+        if not G.has_node(n_name):
+            G.add_node(n_name, type=1)
+
     return G
 
 
@@ -81,3 +91,11 @@ G = generate_network()
 print "节点数 %d " % len(G.nodes())
 print "边数 %d" % len(G.edges())
 
+print "非标准疾病名称 %d" % len(candidate_cache)
+
+with open(NETWORK_FILE, "wb") as data_file:
+    cPickle.dump(G, data_file, True)
+with open(NAME_DICT_FILE, "wb") as data_file:
+    cPickle.dump(candidate_cache, data_file, True)
+with open(INIT_RES, "wb") as data_file:
+    cPickle.dump(init_res, data_file, True)
