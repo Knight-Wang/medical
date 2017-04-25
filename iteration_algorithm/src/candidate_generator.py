@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Author: sunmeng(sunmeng94@163.com)
+
+封装候选实体选取算法
 """
 import os
 import sys
@@ -10,8 +12,12 @@ sys.path.append(os.path.abspath("%s/../../.." % __file__))
 from Preprocess import *
 
 DICT_FILE = "../data/i2025.txt"
-disease_dict = {}
+
+#类似cache，记录每个非标准名称的候选实体选取结果，当再次出现相同的非标准名称时，直接返回结果，避免重复计算
 candidate_cache = {}
+
+#载入字典
+disease_dict = {}
 loop = 0
 for line in open(DICT_FILE, "r"):
     loop += 1
@@ -22,24 +28,12 @@ for line in open(DICT_FILE, "r"):
 
 
 def generate_candidate(mention):
+    """
+    产生候选实体
+    """
     if mention in candidate_cache:
         return candidate_cache[mention]
     p_name = process(mention)
     name_dict, match_type = getMappingResult(p_name, disease_dict, {})
-    candidate_cache[mention] = sorted(name_dict.iteritems(), key=lambda x: x[1], reverse =  True)
+    candidate_cache[mention] = sorted(name_dict.iteritems(), key=lambda x: x[1], reverse=True)
     return candidate_cache[mention]
-
-
-def predict(mention):
-    p_name = process(mention)
-    name_dict, match_type = getMappingResult(p_name, disease_dict)
-    entity_list = []
-    best_score = -1
-    for key in name_dict:
-        if name_dict[key] > best_score:
-            best_score = name_dict[key]
-            entity_list = [key]
-        elif name_dict[key] == best_score:
-            entity_list.append(key)
-    return entity_list
-
