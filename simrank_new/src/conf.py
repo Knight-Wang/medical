@@ -1,8 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
-"""
-Author: sunmeng(sunmeng94@163.com)
-"""
+
 import os
 
 CURRENT_DIR = os.path.abspath("%s/../" % __file__)
@@ -23,3 +21,4 @@ FACTOR_C = 0.8
 NETWORK_FILE = os.path.join(DATA_DIR, "network.bin")
 NAME_DICT_FILE = os.path.join(DATA_DIR, "name_dict.bin")
 INIT_RES = os.path.join(DATA_DIR, "init_res.bin")
+NO_CAND = os.path.join(DATA_DIR, "no_cand.bin")

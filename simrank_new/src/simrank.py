@@ -1,12 +1,9 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-import cPickle
 import sys
-
 import numpy as np
 
-from conf import *
 from test import *
 
 name2id = {}
@@ -57,11 +54,9 @@ def iterate(G, sim_matrix):
                 for vn in G.neighbors(v):
                     total_sim += G[u][un]["weight"] * G[v][vn]["weight"] * sim_matrix[name2id[un], name2id[vn]]
             total_sim *= FACTOR_C
-            # print total_sim
             u_f *= v_f
             if u_f:
                 total_sim /= u_f
-                # print total_sim
                 ret[i, j] = ret[j, i] = 0.2 * total_sim + 0.8 * sim_matrix[i, j]
     return ret
 
@@ -72,14 +67,19 @@ def load():
 
     with open(NAME_DICT_FILE, "rb") as data_file:
         can_dic = cPickle.load(data_file)
+
     with open(INIT_RES, "rb") as data_file:
         init_res = cPickle.load(data_file)
-    return G, can_dic, init_res
+
+    with open(NO_CAND, "rb") as data_file:
+        no_cand = cPickle.load(data_file)
+
+    return G, can_dic, init_res, no_cand
 
 
-G, name_dic, init_res = load()
+G, name_dic, init_res, no_cand = load()
 print "初始结果："
-test_init(name_dic)
+test_init(name_dic, no_cand)
 
 sim_matrix = init(G, name_dic)
 for i in range(NUM_ITERATION):

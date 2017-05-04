@@ -14,6 +14,7 @@ DICT_FILE = "../data/i2025.txt"
 disease_dict = {}
 candidate_cache = {}
 init_res = {}  # 初始相似度较高的
+no_cand = set()  # 没有候选的非标准疾病名称集合
 loop = 0
 for line in open(DICT_FILE, "r"):
     loop += 1
@@ -62,6 +63,7 @@ def generate_network():
                 can_list = generate_candidate(name)
                 if not len(can_list):  # 没有候选，添加default名称
                     can_list = [(u'急性心肌梗死', 0.0)]
+                    no_cand.add(name)  # 将没有候选的非标准疾病名称加入no_cand集合
                 if can_list[0][1] > THRESHOLD:  # 相似度大于阈值
                     G.add_node(can_list[0][0], type=1)
                     if name not in init_res:
@@ -99,3 +101,5 @@ with open(NAME_DICT_FILE, "wb") as data_file:
     cPickle.dump(candidate_cache, data_file, True)
 with open(INIT_RES, "wb") as data_file:
     cPickle.dump(init_res, data_file, True)
+with open(NO_CAND, "wb") as data_file:
+    cPickle.dump(no_cand, data_file, True)
