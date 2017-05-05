@@ -12,7 +12,7 @@ TEST_FILE = os.path.join(DATA_DIR, "test.txt")
 
 FILTER_PREFIX = ["I20", "I21", "I22", "I23", "I24", "I25"]
 NUM_TRAIN = 100000
-NUM_ITERATION = 5
+NUM_ITERATION = 10
 
 THRESHOLD = 0.85
 

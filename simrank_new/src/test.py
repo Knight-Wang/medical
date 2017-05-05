@@ -1,6 +1,10 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
+import cPickle
+
+from conf import *
+
 
 def verdict(x, y):
     if x == y:
@@ -100,7 +104,8 @@ def test_init(name_dict, no_cand):
     RIGHT_FILE = "../res/good_case_init.txt"
     wrong_file = open(WRONG_FILE, "w")
     right_file = open(RIGHT_FILE, "w")
-    cnt_all, correct, wrong, not_in = 0, 0, 0, 0
+    cnt_all, correct, wrong, not_in, recall = 0, 0, 0, 0, 0
+    num_dist = [0, 0, 0, 0, 0, 0, 0]  # 候选实体数量分布
     for i, record in enumerate(open("../data/test.txt", "r")):
         x = record.rstrip("\n").decode("UTF-8").split("\t")
         for t in x:
@@ -110,6 +115,12 @@ def test_init(name_dict, no_cand):
             cnt_all += 1
             if d[0] in no_cand:
                 not_in += 1
+            entity_set = set()
+            for e in name_dict[d[0]]:
+                entity_set.add(e[0])
+            num_dist[len(entity_set) / 2] += 1
+            if d[1] in entity_set:
+                recall += 1
             res, real_name = verdict(name_dict[d[0]][0][0], d[1])
             if res:
                 correct += 1
@@ -126,6 +137,11 @@ def test_init(name_dict, no_cand):
     print "not_in %d" % not_in
     print "all %d" % cnt_all
     print "Correct %d" % correct
+    print "recall num %d" % recall
+    print "recall rate %f" % (recall * 1.0 / cnt_all)
+    print '分布：'
+    for i, n in enumerate(num_dist):
+        print i, n
     print "Wrong %d" % wrong
     print "Percent %.3f" % (correct * 1.0 / (correct + wrong))
     wrong_file.close()
@@ -259,3 +275,12 @@ def test(res, init_res, num):
     total_sum /= len(f1_num)
 
     print '平均f1 %.3f' % total_sum
+
+
+with open(NAME_DICT_FILE, "rb") as data_file:
+    can_dic = cPickle.load(data_file)
+
+with open(NO_CAND, "rb") as data_file:
+    no_cand = cPickle.load(data_file)
+
+test_init(can_dic, no_cand)

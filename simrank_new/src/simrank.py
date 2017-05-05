@@ -3,8 +3,10 @@
 
 import sys
 import numpy as np
+import cPickle
 
 from test import *
+from conf import *
 
 name2id = {}
 id2name = []
@@ -40,7 +42,11 @@ def init(G, name_dic):
 def iterate(G, sim_matrix):
     ret = sim_matrix
     for i, u in enumerate(G.nodes()):
+        if not G.neighbors(u):  # 没有邻居就不用计算
+            continue
         for j, v in enumerate(G.nodes()):
+            if not G.neighbors(v):  # 没有邻居就不用计算
+                continue
             total_sim = 0.0
             u_f = 0
             for un in G.neighbors(u):
@@ -57,7 +63,7 @@ def iterate(G, sim_matrix):
             u_f *= v_f
             if u_f:
                 total_sim /= u_f
-                ret[i, j] = ret[j, i] = 0.2 * total_sim + 0.8 * sim_matrix[i, j]
+                ret[i, j] = ret[j, i] = 0.1 * total_sim + 0.9 * sim_matrix[i, j]
     return ret
 
 
