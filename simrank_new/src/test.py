@@ -114,6 +114,7 @@ def test_init(name_dict, no_cand):
                 continue
             cnt_all += 1
             if d[0] in no_cand:
+
                 not_in += 1
             entity_set = set()
             for e in name_dict[d[0]]:
