@@ -283,4 +283,4 @@ with open(NAME_DICT_FILE, "rb") as data_file:
 with open(NO_CAND, "rb") as data_file:
     no_cand = cPickle.load(data_file)
 
-test_init(can_dic, no_cand)
+# test_init(can_dic, no_cand)

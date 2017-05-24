@@ -4,9 +4,65 @@
 import sys
 import numpy as np
 import cPickle
+import networkx as nx
 
 from test import *
 from conf import *
+
+G = nx.Graph()
+'''
+G.add_node('A', type=1)
+G.add_node('B', type=1)
+G.add_node('C', type=1)
+G.add_node('E', type=1)
+G.add_node('X', type=1)  # mark
+G.add_node('Y', type=1)  # mark
+# G.add_node('Z', type=1)  # mark
+G.add_node('A*', type=0)
+G.add_node('C*', type=0)
+
+G.add_edge('A*', 'B', weight=1)
+G.add_edge('A*', 'A', weight=1)
+G.add_edge('A*', 'C', weight=4)
+G.add_edge('C*', 'A', weight=3)
+G.add_edge('C*', 'C', weight=1)
+G.add_edge('C*', 'X', weight=20)  # mark
+G.add_edge('C*', 'Y', weight=21)  # mark
+G.add_edge('C', 'X', weight=10)  # mark
+G.add_edge('C', 'Y', weight=10)  # mark
+G.add_edge('A', 'E', weight=1)
+# G.add_edge('C*', 'Z', weight=1)  # mark
+
+name_dic = {}
+name_dic['C*'] = []
+name_dic['C*'].append(('C', 0.8))
+# name_dic['C*'].append(('Z', 0.9))  # mark
+name_dic['A*'] = []
+name_dic['A*'].append(('A', 0.5))
+name_dic['A*'].append(('B', 0.6))
+
+init_res = {}
+'''
+
+
+G.add_node('A*', type=0)
+G.add_node('A', type=1)
+G.add_node('C', type=1)
+G.add_node('B', type=1)
+
+G.add_edge('A*', 'A', weight=1)
+G.add_edge('A*', 'C', weight=8)
+G.add_edge('A', 'C', weight=13)
+G.add_edge('A*', 'B', weight=1)
+
+name_dic = {}
+name_dic['A*'] = []
+name_dic['A*'].append(('A', 0.5))
+name_dic['A*'].append(('B', 0.6))
+
+init_res = {}
+
+
 
 name2id = {}
 id2name = []
@@ -36,6 +92,10 @@ def init(G, name_dic):
     for i in range(n):
         sim_matrix[i, i] = 1.0
 
+    print name2id
+    print id2name
+    print sim_matrix
+
     return sim_matrix
 
 
@@ -63,7 +123,9 @@ def iterate(G, sim_matrix):
             u_f *= v_f
             if u_f:
                 total_sim /= u_f
-                ret[i, j] = ret[j, i] = 0.1 * total_sim + 0.9 * sim_matrix[i, j]
+                print u, v, total_sim
+                ret[i, j] = 0.1 * total_sim + 0.9 * sim_matrix[i, j]
+    print ret
     return ret
 
 
@@ -83,25 +145,35 @@ def load():
     return G, can_dic, init_res, no_cand
 
 
-G, name_dic, init_res, no_cand = load()
-print "初始结果："
-test_init(name_dic, no_cand)
+# G, name_dic, init_res, no_cand = load()
+# print "初始结果："
+# test_init(name_dic, no_cand)
 
 sim_matrix = init(G, name_dic)
 for i in range(NUM_ITERATION):
-    print >> sys.stderr, "ITERATION %d" % (i + 1)
+    print "ITERATION %d" % (i + 1)
     sim_matrix = iterate(G, sim_matrix)
     res = {}
+    rank = {}
     for j, nj in enumerate(G.nodes()):
         if G.node[nj]["type"] == 0:
             maxn = 0.0
             max_name = u""
-            for k, nk in enumerate(G.nodes()):
-                if G.node[nk]["type"] == 1:
-                    if sim_matrix[j, k] > maxn:
-                        maxn = sim_matrix[j, k]
-                        max_name = nk
+            for k in name_dic[nj]:
+                if G.node[k[0]]["type"] == 1:
+                    rank[k[0]] = sim_matrix[j, name2id[k[0]]]
+                    if sim_matrix[j, name2id[k[0]]] > maxn:
+                        maxn = sim_matrix[j, name2id[k[0]]]
+                        max_name = k[0]
             if maxn > 1e-6:
                 res[nj] = (max_name, maxn)
-    test(res, init_res, i + 1)
+
+    for k, v in res.iteritems():
+        print k, v
+    print '============'
+    for k, v in rank.iteritems():
+        print k, v
+    print '++++++++++++'
+
+    # test(res, init_res, i + 1)
 
