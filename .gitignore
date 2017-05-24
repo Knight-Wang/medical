@@ -1,16 +1,11 @@
 # python
 
 # txt
-/texts/in/
-/texts/out/
+
 /Experiment/
 /Experiment_LabeledData/
-/neighbour_test_texts/
-/main_new_texts/
-/iteration_texts/
 /filtered_records/
 /iteration_algorithm/res/
-/iteration_simrank/res/
 /simrank_new/res/
 
 # csv
